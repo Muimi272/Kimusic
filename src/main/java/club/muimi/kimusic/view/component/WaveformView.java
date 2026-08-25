@@ -64,8 +64,10 @@ public final class WaveformView extends Region {
         }
         double displayMaxFrequency = Math.max(20.0, Math.min(20_000.0, maxFrequencyHz));
         for (int index = 0; index < spectrum.length; index++) {
-            int from;
-            int to;
+            int from = 0;
+            int to = 0;
+            double energy = 0;
+            double count = 0;
             if (bandAggregated) {
                 from = Math.min(values.length - 1,
                         (int) ((long) index * values.length / spectrum.length));
@@ -75,17 +77,26 @@ public final class WaveformView extends Region {
                         (double) index / spectrum.length);
                 double toFrequency = 20.0 * Math.pow(displayMaxFrequency / 20.0,
                         (double) (index + 1) / spectrum.length);
-                double binsPerHertz = values.length / maxFrequencyHz;
-                from = Math.max(1, (int) Math.floor(fromFrequency * binsPerHertz));
-                to = Math.min(values.length, Math.max(from + 1,
-                        (int) Math.ceil(toFrequency * binsPerHertz)));
+                double fromBin = fromFrequency / maxFrequencyHz * values.length;
+                double toBin = toFrequency / maxFrequencyHz * values.length;
+                int firstBin = Math.max(0, (int) Math.floor(fromBin));
+                int lastBin = Math.min(values.length - 1, (int) Math.ceil(toBin) - 1);
+                for (int source = firstBin; source <= lastBin; source++) {
+                    double weight = Math.min(toBin, source + 1.0) - Math.max(fromBin, source);
+                    if (weight <= 0) {
+                        continue;
+                    }
+                    double value = Math.max(0, Math.min(20, values[source]));
+                    energy += value * value * weight;
+                    count += weight;
+                }
             }
-            double energy = 0;
-            int count = 0;
-            for (int source = from; source < to; source++) {
-                double value = Math.max(0, Math.min(20, values[source]));
-                energy += value * value;
-                count++;
+            if (bandAggregated) {
+                for (int source = from; source < to; source++) {
+                    double bandValue = Math.max(0, Math.min(20, values[source]));
+                    energy += bandValue * bandValue;
+                    count++;
+                }
             }
             float value = count == 0 ? 0 : (float) Math.sqrt(energy / count);
             // Preserve headroom so dense peaks can be normalized during drawing.
