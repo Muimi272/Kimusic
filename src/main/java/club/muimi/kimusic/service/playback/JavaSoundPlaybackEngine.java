@@ -133,7 +133,8 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
                         int outputBytes = downmix
                                 ? downmixPcm16(buffer, read, decoderFormat.getChannels(), outputBuffer)
                                 : read;
-                        VisualizationFrame visualization = analyzeAndApplyVolume(outputBuffer, outputBytes);
+                        VisualizationFrame visualization = analyzeAndApplyVolume(
+                                outputBuffer, outputBytes, outputFormat.getSampleRate() / 2.0);
                         output.write(outputBuffer, 0, outputBytes);
                         frames += outputBytes / outputFormat.getFrameSize();
                         listener.onProgress(startSeconds + frames / outputFormat.getFrameRate(), visualization);
@@ -287,7 +288,7 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
         }
     }
 
-    private VisualizationFrame analyzeAndApplyVolume(byte[] buffer, int length) {
+    private VisualizationFrame analyzeAndApplyVolume(byte[] buffer, int length, double maxFrequencyHz) {
         float[] waveform = new float[64];
         int sampleCount = Math.max(1, length / 2);
         int samplesPerBand = Math.max(1, sampleCount / waveform.length);
@@ -301,7 +302,7 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
             int band = Math.min(waveform.length - 1, sample / samplesPerBand);
             waveform[band] = Math.max(waveform[band], Math.abs(scaled) / 32768f);
         }
-        return new VisualizationFrame(waveform, spectrumOf(buffer, length));
+        return new VisualizationFrame(waveform, spectrumOf(buffer, length), maxFrequencyHz);
     }
 
     private float[] spectrumOf(byte[] buffer, int length) {

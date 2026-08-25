@@ -42,7 +42,7 @@ public final class WaveformView extends Region {
             return;
         }
         pushWaveform(frame.waveform());
-        pushSpectrum(frame.spectrum());
+        pushSpectrum(frame.spectrum(), frame.maxFrequencyHz());
         draw();
     }
 
@@ -58,14 +58,17 @@ public final class WaveformView extends Region {
         cursor = (cursor + 1) % history.length;
     }
 
-    private void pushSpectrum(float[] values) {
+    private void pushSpectrum(float[] values, double maxFrequencyHz) {
         if (values == null || values.length == 0) {
             return;
         }
+        double displayMaxFrequency = Math.max(20.0, Math.min(20_000.0, maxFrequencyHz));
         for (int index = 0; index < spectrum.length; index++) {
-            double fromFrequency = 20.0 * Math.pow(1000.0, (double) index / spectrum.length);
-            double toFrequency = 20.0 * Math.pow(1000.0, (double) (index + 1) / spectrum.length);
-            double binsPerHertz = values.length / 20000.0;
+            double fromFrequency = 20.0 * Math.pow(displayMaxFrequency / 20.0,
+                    (double) index / spectrum.length);
+            double toFrequency = 20.0 * Math.pow(displayMaxFrequency / 20.0,
+                    (double) (index + 1) / spectrum.length);
+            double binsPerHertz = values.length / maxFrequencyHz;
             int from = Math.max(1, (int) Math.floor(fromFrequency * binsPerHertz));
             int to = Math.min(values.length, Math.max(from + 1,
                     (int) Math.ceil(toFrequency * binsPerHertz)));
