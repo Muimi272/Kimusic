@@ -42,7 +42,7 @@ public final class WaveformView extends Region {
             return;
         }
         pushWaveform(frame.waveform());
-        pushSpectrum(frame.spectrum());
+        pushSpectrum(frame.spectrum(), frame.maxFrequencyHz(), frame.spectrumIsBandAggregated());
         draw();
     }
 
@@ -58,15 +58,48 @@ public final class WaveformView extends Region {
         cursor = (cursor + 1) % history.length;
     }
 
-    private void pushSpectrum(float[] values) {
+    private void pushSpectrum(float[] values, double maxFrequencyHz, boolean bandAggregated) {
         if (values == null || values.length == 0) {
             return;
         }
+        double displayMaxFrequency = Math.max(20.0, Math.min(20_000.0, maxFrequencyHz));
         for (int index = 0; index < spectrum.length; index++) {
-            int source = Math.min(values.length - 1,
-                    (int) ((long) index * values.length / spectrum.length));
+            int from = 0;
+            int to = 0;
+            double energy = 0;
+            double count = 0;
+            if (bandAggregated) {
+                from = Math.min(values.length - 1,
+                        (int) ((long) index * values.length / spectrum.length));
+                to = Math.min(values.length, from + 1);
+            } else {
+                double fromFrequency = 20.0 * Math.pow(displayMaxFrequency / 20.0,
+                        (double) index / spectrum.length);
+                double toFrequency = 20.0 * Math.pow(displayMaxFrequency / 20.0,
+                        (double) (index + 1) / spectrum.length);
+                double fromBin = fromFrequency / maxFrequencyHz * values.length;
+                double toBin = toFrequency / maxFrequencyHz * values.length;
+                int firstBin = Math.max(0, (int) Math.floor(fromBin));
+                int lastBin = Math.min(values.length - 1, (int) Math.ceil(toBin) - 1);
+                for (int source = firstBin; source <= lastBin; source++) {
+                    double weight = Math.min(toBin, source + 1.0) - Math.max(fromBin, source);
+                    if (weight <= 0) {
+                        continue;
+                    }
+                    double value = Math.max(0, Math.min(20, values[source]));
+                    energy += value * value * weight;
+                    count += weight;
+                }
+            }
+            if (bandAggregated) {
+                for (int source = from; source < to; source++) {
+                    double bandValue = Math.max(0, Math.min(20, values[source]));
+                    energy += bandValue * bandValue;
+                    count++;
+                }
+            }
+            float value = count == 0 ? 0 : (float) Math.sqrt(energy / count);
             // Preserve headroom so dense peaks can be normalized during drawing.
-            float value = Math.max(0, Math.min(4, values[source]));
             spectrum[index] += (value - spectrum[index]) * (value > spectrum[index] ? 0.62f : 0.2f);
             spectrumPeaks[index] = Math.max(spectrum[index], spectrumPeaks[index] - 0.018f);
         }
@@ -151,11 +184,17 @@ public final class WaveformView extends Region {
         displayScale = Math.max(0.35, Math.min(6.0, displayScale));
         for (int index = 0; index < spectrum.length; index++) {
             double x = index * width / spectrum.length;
-            double magnitude = Math.max(0.025, Math.min(1.0, spectrum[index] * displayScale));
+            float raw = (float) (spectrum[index] * displayScale);
+            double db = 20 * Math.log10(raw + 1e-12);
+            double normalized = (db + 120) / 120;
+            double magnitude = Math.max(0.025, Math.min(1.0, normalized));
             double barHeight = Math.max(3, magnitude * (height - 13));
             graphics.setFill(Color.web("#1aa79b", 0.9));
             graphics.fillRoundRect(x, height - barHeight, bandWidth, barHeight, 3, 3);
-            double peakMagnitude = Math.min(1.0, spectrumPeaks[index] * displayScale);
+            float peakRaw = (float) (spectrumPeaks[index] * displayScale);
+            double peakDb = 20 * Math.log10(peakRaw + 1e-12);
+            double peakNormalized = (peakDb + 120) / 120;
+            double peakMagnitude = Math.max(0.025, Math.min(1.0, peakNormalized));
             double peakY = height - Math.max(3, peakMagnitude * (height - 13));
             graphics.setFill(Color.web("#8be0d5", 0.86));
             graphics.fillRoundRect(x, peakY, bandWidth, 2, 2, 2);

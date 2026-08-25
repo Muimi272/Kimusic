@@ -133,7 +133,9 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
                         int outputBytes = downmix
                                 ? downmixPcm16(buffer, read, decoderFormat.getChannels(), outputBuffer)
                                 : read;
-                        VisualizationFrame visualization = analyzeAndApplyVolume(outputBuffer, outputBytes);
+                        VisualizationFrame visualization = analyzeAndApplyVolume(
+                                outputBuffer, outputBytes, outputFormat.getChannels(),
+                                outputFormat.getSampleRate() / 2.0);
                         output.write(outputBuffer, 0, outputBytes);
                         frames += outputBytes / outputFormat.getFrameSize();
                         listener.onProgress(startSeconds + frames / outputFormat.getFrameRate(), visualization);
@@ -287,7 +289,8 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
         }
     }
 
-    private VisualizationFrame analyzeAndApplyVolume(byte[] buffer, int length) {
+    private VisualizationFrame analyzeAndApplyVolume(byte[] buffer, int length, int channels,
+                                                      double maxFrequencyHz) {
         float[] waveform = new float[64];
         int sampleCount = Math.max(1, length / 2);
         int samplesPerBand = Math.max(1, sampleCount / waveform.length);
@@ -301,40 +304,43 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
             int band = Math.min(waveform.length - 1, sample / samplesPerBand);
             waveform[band] = Math.max(waveform[band], Math.abs(scaled) / 32768f);
         }
-        return new VisualizationFrame(waveform, spectrumOf(buffer, length));
+        return new VisualizationFrame(waveform, spectrumOf(buffer, length, channels), maxFrequencyHz);
     }
 
-    private float[] spectrumOf(byte[] buffer, int length) {
-        int availableSamples = length / 2;
-        int fftSize = Integer.highestOneBit(Math.min(1_024, availableSamples));
+    private float[] spectrumOf(byte[] buffer, int length, int channels) {
+        int channelCount = Math.max(1, channels);
+        int availableFrames = length / (channelCount * 2);
+        int fftSize = availableFrames >= 1_024 ? 4_096
+                : Integer.highestOneBit(availableFrames);
         if (fftSize < 2) {
             return new float[64];
         }
         double[] real = new double[fftSize];
         double[] imaginary = new double[fftSize];
-        for (int index = 0; index < fftSize; index++) {
-            int offset = index * 2;
-            short sample = (short) ((buffer[offset] & 0xff) | (buffer[offset + 1] << 8));
-            double window = 0.5 - 0.5 * Math.cos(2 * Math.PI * index / (fftSize - 1));
+        double windowSum = 0;
+        int windowSamples = Math.min(availableFrames, fftSize);
+        for (int index = 0; index < windowSamples; index++) {
+            int frameOffset = index * channelCount * 2;
+            double sampleSum = 0;
+            for (int channel = 0; channel < channelCount; channel++) {
+                int offset = frameOffset + channel * 2;
+                sampleSum += (short) ((buffer[offset] & 0xff) | (buffer[offset + 1] << 8));
+            }
+            double sample = sampleSum / channelCount;
+            double window = 0.5 - 0.5 * Math.cos(2 * Math.PI * index / Math.max(1, windowSamples - 1));
             real[index] = sample / 32768.0 * window;
+            windowSum += window;
         }
         fft(real, imaginary);
 
-        float[] spectrum = new float[64];
+        // Return calibrated linear amplitudes. WaveformView performs the only
+        // logarithmic frequency and dB projection.
         int usableBins = fftSize / 2;
-        for (int band = 0; band < spectrum.length; band++) {
-            double fromRatio = band / (double) spectrum.length;
-            double toRatio = (band + 1) / (double) spectrum.length;
-            int from = Math.max(1, (int) Math.round(Math.pow(fromRatio, 2) * usableBins));
-            int to = Math.max(from + 1, (int) Math.round(Math.pow(toRatio, 2) * usableBins));
-            double peak = 0;
-            for (int bin = from; bin < Math.min(to, usableBins); bin++) {
-                peak = Math.max(peak, Math.hypot(real[bin], imaginary[bin]));
-            }
-            // Keep a little over-range so the view can normalize all bands against
-            // the current maximum instead of flattening clipped peaks.
-            spectrum[band] = (float) Math.max(0, Math.min(4,
-                    Math.log10(1 + peak * 18) / Math.log10(19)));
+        float[] spectrum = new float[usableBins];
+        for (int bin = 1; bin < usableBins; bin++) {
+            double magnitude = Math.hypot(real[bin], imaginary[bin]);
+            double amplitude = windowSum > 0 ? magnitude * 2.0 / windowSum : 0;
+            spectrum[bin] = (float) Math.max(0, Math.min(20, amplitude));
         }
         return spectrum;
     }
