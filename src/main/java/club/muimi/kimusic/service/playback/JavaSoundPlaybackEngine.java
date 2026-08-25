@@ -312,24 +312,24 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
         }
         double[] real = new double[fftSize];
         double[] imaginary = new double[fftSize];
+        double windowSum = 0;
         for (int index = 0; index < fftSize; index++) {
             int offset = index * 2;
             short sample = (short) ((buffer[offset] & 0xff) | (buffer[offset + 1] << 8));
             double window = 0.5 - 0.5 * Math.cos(2 * Math.PI * index / (fftSize - 1));
             real[index] = sample / 32768.0 * window;
+            windowSum += window;
         }
         fft(real, imaginary);
 
-        // Return the positive-frequency FFT bins. WaveformView owns the only
-        // frequency-band projection so logarithmic scaling is not applied twice.
+        // Return calibrated linear amplitudes. WaveformView performs the only
+        // logarithmic frequency and dB projection.
         int usableBins = fftSize / 2;
         float[] spectrum = new float[usableBins];
         for (int bin = 1; bin < usableBins; bin++) {
             double magnitude = Math.hypot(real[bin], imaginary[bin]);
-            // Keep a little over-range so the view can normalize all bands against
-            // the current maximum instead of flattening clipped peaks.
-            spectrum[bin] = (float) Math.max(0, Math.min(4,
-                    Math.log10(1 + magnitude * 18) / Math.log10(19)));
+            double amplitude = windowSum > 0 ? magnitude * 2.0 / windowSum : 0;
+            spectrum[bin] = (float) Math.max(0, Math.min(20, amplitude));
         }
         return spectrum;
     }
