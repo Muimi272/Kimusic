@@ -320,21 +320,16 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
         }
         fft(real, imaginary);
 
-        float[] spectrum = new float[64];
+        // Return the positive-frequency FFT bins. WaveformView owns the only
+        // frequency-band projection so logarithmic scaling is not applied twice.
         int usableBins = fftSize / 2;
-        for (int band = 0; band < spectrum.length; band++) {
-            double fromRatio = band / (double) spectrum.length;
-            double toRatio = (band + 1) / (double) spectrum.length;
-            int from = Math.max(1, (int) Math.round(Math.pow(fromRatio, 2) * usableBins));
-            int to = Math.max(from + 1, (int) Math.round(Math.pow(toRatio, 2) * usableBins));
-            double peak = 0;
-            for (int bin = from; bin < Math.min(to, usableBins); bin++) {
-                peak = Math.max(peak, Math.hypot(real[bin], imaginary[bin]));
-            }
+        float[] spectrum = new float[usableBins];
+        for (int bin = 1; bin < usableBins; bin++) {
+            double magnitude = Math.hypot(real[bin], imaginary[bin]);
             // Keep a little over-range so the view can normalize all bands against
             // the current maximum instead of flattening clipped peaks.
-            spectrum[band] = (float) Math.max(0, Math.min(4,
-                    Math.log10(1 + peak * 18) / Math.log10(19)));
+            spectrum[bin] = (float) Math.max(0, Math.min(4,
+                    Math.log10(1 + magnitude * 18) / Math.log10(19)));
         }
         return spectrum;
     }
