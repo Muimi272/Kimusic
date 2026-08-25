@@ -63,10 +63,10 @@ public final class WaveformView extends Region {
             return;
         }
         for (int index = 0; index < spectrum.length; index++) {
-            double normalized = (double) index / spectrum.length;
-            double freq = 20.0 * Math.pow(20000.0 / 20.0, normalized);
-            int source = (int) (freq / (20000.0 / values.length));
-            source = Math.min(values.length - 1, Math.max(0, source));
+            // The playback analyzer already aggregates FFT bins into frequency bands.
+            // Keep those bands in order instead of applying a second frequency map.
+            int source = Math.min(values.length - 1,
+                    (int) ((long) index * values.length / spectrum.length));
             // Preserve headroom so dense peaks can be normalized during drawing.
             float value = Math.max(0, Math.min(20, values[source]));
             spectrum[index] += (value - spectrum[index]) * (value > spectrum[index] ? 0.62f : 0.2f);
