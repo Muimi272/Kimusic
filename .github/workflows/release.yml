@@ -65,6 +65,16 @@ jobs:
           cp staging/input/Kimusic.jar release/Kimusic-0.1.0.jar
           jpackage --type deb --name Kimusic --app-version 0.1.0 --input staging/input --main-jar Kimusic.jar --main-class club.muimi.kimusic.Launcher --dest release
           jpackage --type app-image --name Kimusic --app-version 0.1.0 --input staging/input --main-jar Kimusic.jar --main-class club.muimi.kimusic.Launcher --dest staging
+          cp src/main/resources/club/muimi/kimusic/logo.png staging/Kimusic/kimusic.png
+          cat > staging/Kimusic/Kimusic.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Kimusic
+          Exec=Kimusic
+          Icon=kimusic
+          Categories=AudioVideo;Audio;Player;
+          Terminal=false
+          EOF
           curl -L --fail --output appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool.AppImage
           ARCH=x86_64 ./appimagetool.AppImage --appimage-extract-and-run staging/Kimusic release/Kimusic-x86_64.AppImage
