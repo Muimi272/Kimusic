@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import club.muimi.kimusic.view.component.SvgIcon?>
+<?import club.muimi.kimusic.view.component.WaveformView?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TreeView?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane fx:id="root" prefHeight="860.0" prefWidth="1440.0" styleClass="app-root"
+            xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="club.muimi.kimusic.view.MainController">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="top-bar">
+            <Button fx:id="menuButton" accessibleText="折叠菜单" mnemonicParsing="false" onAction="#toggleMenu" styleClass="icon-action">
+                <graphic><SvgIcon resource="/club/muimi/kimusic/icons/menu.svg" size="19.0" /></graphic>
+            </Button>
+            <Region HBox.hgrow="ALWAYS" />
+            <Label fx:id="noticeLabel" maxWidth="520.0" styleClass="notice" text="" visible="false" />
+            <Button fx:id="themeButton" accessibleText="切换主题" mnemonicParsing="false" onAction="#toggleTheme" styleClass="icon-action">
+                <graphic><SvgIcon fx:id="themeIcon" resource="/club/muimi/kimusic/icons/moon.svg" size="18.0" /></graphic>
+            </Button>
+            <Button accessibleText="设置" mnemonicParsing="false" onAction="#openSettings" styleClass="icon-action">
+                <graphic><SvgIcon resource="/club/muimi/kimusic/icons/settings.svg" size="18.0" /></graphic>
+            </Button>
+            <ImageView fx:id="headerLogo" fitHeight="30.0" fitWidth="30.0" mouseTransparent="true"
+                       preserveRatio="true" smooth="true" styleClass="header-logo">
+                <image><Image url="@logo.png" /></image>
+            </ImageView>
+        </HBox>
+    </top>
+    <left>
+        <VBox fx:id="sidebar" maxWidth="292.0" minWidth="292.0" prefWidth="292.0" spacing="10.0" styleClass="sidebar">
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                <VBox spacing="1.0">
+                    <Label styleClass="section-title" text="本地音乐" />
+                    <Label styleClass="eyebrow" text="LIBRARY" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="importButton" accessibleText="导入音乐" mnemonicParsing="false" onAction="#showImportMenu" styleClass="small-icon-action">
+                    <graphic><SvgIcon resource="/club/muimi/kimusic/icons/plus.svg" size="17.0" /></graphic>
+                </Button>
+                <Button accessibleText="移除根目录" mnemonicParsing="false" onAction="#removeLibraryRoot" styleClass="small-icon-action">
+                    <graphic><SvgIcon resource="/club/muimi/kimusic/icons/minus.svg" size="17.0" /></graphic>
+                </Button>
+            </HBox>
+            <TreeView fx:id="libraryTree" VBox.vgrow="ALWAYS" />
+            <HBox alignment="CENTER_LEFT" spacing="8.0" styleClass="playlist-heading">
+                <Label styleClass="section-title-small" text="我的歌单" />
+                <Region HBox.hgrow="ALWAYS" />
+                <Button accessibleText="新建歌单" mnemonicParsing="false" onAction="#createPlaylist" styleClass="small-icon-action">
+                    <graphic><SvgIcon resource="/club/muimi/kimusic/icons/plus.svg" size="15.0" /></graphic>
+                </Button>
+                <Button accessibleText="删除歌单" mnemonicParsing="false" onAction="#deletePlaylist" styleClass="small-icon-action">
+                    <graphic><SvgIcon resource="/club/muimi/kimusic/icons/minus.svg" size="15.0" /></graphic>
+                </Button>
+            </HBox>
+            <ListView fx:id="playlistList" maxHeight="132.0" minHeight="82.0" prefHeight="112.0" />
+        </VBox>
+    </left>
+    <center>
+        <StackPane fx:id="workspaceStack">
+            <SplitPane fx:id="workspaceSplit" dividerPositions="0.60" orientation="HORIZONTAL" styleClass="workspace-split">
+                <VBox minWidth="420.0" prefWidth="680.0" spacing="14.0" styleClass="track-pane" HBox.hgrow="ALWAYS">
+                    <HBox alignment="CENTER_LEFT" spacing="12.0">
+                        <VBox spacing="2.0">
+                            <Label fx:id="viewTitleLabel" styleClass="view-title" text="音乐资料库" />
+                            <Label fx:id="trackCountLabel" styleClass="muted" text="0 首" />
+                        </VBox>
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Button mnemonicParsing="false" onAction="#showLibraryView" styleClass="text-action" text="全部曲目" />
+                        <Button mnemonicParsing="false" onAction="#addToPlaylist" styleClass="accent-action" text="加入歌单" />
+                    </HBox>
+                    <TableView fx:id="trackTable" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="indexColumn" maxWidth="58.0" minWidth="48.0" prefWidth="48.0" text="#" />
+                            <TableColumn fx:id="titleColumn" minWidth="210.0" prefWidth="360.0" text="曲目" />
+                            <TableColumn fx:id="folderColumn" minWidth="180.0" prefWidth="360.0" text="位置" />
+                        </columns>
+                        <placeholder><Label styleClass="empty-label" text="从左侧导入你的第一首音乐" /></placeholder>
+                    </TableView>
+                </VBox>
+                <VBox fx:id="visualPane" alignment="CENTER" minWidth="390.0" prefWidth="470.0" spacing="18.0" styleClass="visual-pane">
+                    <HBox alignment="CENTER_RIGHT">
+                        <Button fx:id="lyricsButton" mnemonicParsing="false" onAction="#toggleLyrics" styleClass="lyrics-toggle" text="歌词">
+                            <graphic><SvgIcon resource="/club/muimi/kimusic/icons/lyrics.svg" size="16.0" /></graphic>
+                        </Button>
+                    </HBox>
+                    <StackPane fx:id="visualStack" minHeight="320.0" VBox.vgrow="ALWAYS">
+                        <StackPane fx:id="coverPane" maxHeight="440.0" maxWidth="440.0" minHeight="280.0" minWidth="280.0" styleClass="cover-shell">
+                            <ImageView fx:id="coverImage" preserveRatio="false" smooth="true" visible="false" />
+                            <VBox fx:id="coverPlaceholder" alignment="CENTER" spacing="18.0" styleClass="cover-placeholder">
+                                <ImageView fitHeight="94.0" fitWidth="94.0" preserveRatio="true" smooth="true" styleClass="cover-logo">
+                                    <image><Image url="@logo.png" /></image>
+                                </ImageView>
+                                <Label styleClass="cover-placeholder-title" text="KIMUSIC" />
+                                <Label styleClass="eyebrow" text="LOCAL SOUND" />
+                            </VBox>
+                        </StackPane>
+                        <VBox fx:id="lyricsPane" alignment="CENTER" managed="false" opacity="0.0" visible="false">
+                            <ListView fx:id="lyricsList" focusTraversable="false" VBox.vgrow="ALWAYS">
+                                <placeholder><Label styleClass="empty-label" text="当前曲目没有歌词" /></placeholder>
+                            </ListView>
+                        </VBox>
+                    </StackPane>
+                    <VBox fx:id="visualFooter" alignment="CENTER" spacing="8.0" styleClass="visual-footer">
+                        <WaveformView fx:id="waveformView" maxWidth="440.0" />
+                        <VBox alignment="CENTER" spacing="4.0">
+                            <Label fx:id="visualTitleLabel" maxWidth="440.0" styleClass="visual-title" text="选择一首音乐" textOverrun="ELLIPSIS" />
+                            <Label fx:id="visualPathLabel" maxWidth="400.0" styleClass="muted" text="" textOverrun="CENTER_ELLIPSIS" />
+                        </VBox>
+                    </VBox>
+                </VBox>
+            </SplitPane>
+            <VBox fx:id="queueDrawer" alignment="TOP_CENTER" maxHeight="390.0" minHeight="300.0" prefHeight="360.0"
+                  spacing="12.0" styleClass="queue-drawer" translateY="420.0" StackPane.alignment="BOTTOM_CENTER">
+                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                    <VBox spacing="2.0">
+                        <Label styleClass="view-title" text="当前播放列表" />
+                        <Label fx:id="queueCountLabel" styleClass="muted" text="0 首" />
+                    </VBox>
+                    <Region HBox.hgrow="ALWAYS" />
+                    <Button accessibleText="关闭播放列表" mnemonicParsing="false" onAction="#toggleQueue" styleClass="icon-action">
+                        <graphic><SvgIcon resource="/club/muimi/kimusic/icons/close.svg" size="18.0" /></graphic>
+                    </Button>
+                </HBox>
+                <ListView fx:id="queueList" VBox.vgrow="ALWAYS" />
+            </VBox>
+        </StackPane>
+    </center>
+    <bottom>
+        <VBox spacing="8.0" styleClass="player-bar">
+            <HBox alignment="CENTER" spacing="10.0">
+                <Label fx:id="currentTimeLabel" minWidth="42.0" styleClass="time-label" text="0:00" />
+                <Slider fx:id="progressSlider" blockIncrement="0.01" max="1.0" HBox.hgrow="ALWAYS" />
+                <Label fx:id="totalTimeLabel" minWidth="42.0" styleClass="time-label" text="0:00" />
+            </HBox>
+            <HBox alignment="CENTER_LEFT" spacing="14.0">
+                <VBox minWidth="260.0" prefWidth="330.0" spacing="2.0">
+                    <Label fx:id="nowTitleLabel" maxWidth="320.0" styleClass="now-title" text="未在播放" textOverrun="ELLIPSIS" />
+                    <Label fx:id="nowPathLabel" maxWidth="320.0" styleClass="muted" text="" textOverrun="CENTER_ELLIPSIS" />
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+                <Button accessibleText="上一首" mnemonicParsing="false" onAction="#previousTrack" styleClass="transport-action">
+                    <graphic><SvgIcon resource="/club/muimi/kimusic/icons/previous.svg" size="20.0" /></graphic>
+                </Button>
+                <Button fx:id="playPauseButton" accessibleText="播放" mnemonicParsing="false" onAction="#togglePlayback" styleClass="play-action">
+                    <graphic><SvgIcon fx:id="playPauseIcon" resource="/club/muimi/kimusic/icons/play.svg" size="20.0" /></graphic>
+                </Button>
+                <Button accessibleText="下一首" mnemonicParsing="false" onAction="#nextTrack" styleClass="transport-action">
+                    <graphic><SvgIcon resource="/club/muimi/kimusic/icons/next.svg" size="20.0" /></graphic>
+                </Button>
+                <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="modeButton" accessibleText="顺序播放" mnemonicParsing="false"
+                        onAction="#cyclePlayMode" styleClass="mode-action">
+                    <graphic><SvgIcon fx:id="modeIcon" resource="/club/muimi/kimusic/icons/mode-sequential.svg" size="19.0" /></graphic>
+                </Button>
+                <SvgIcon resource="/club/muimi/kimusic/icons/volume.svg" size="17.0" />
+                <Slider fx:id="volumeSlider" blockIncrement="0.05" max="1.0" prefWidth="100.0" value="0.8" />
+                <Button fx:id="queueButton" mnemonicParsing="false" onAction="#toggleQueue" styleClass="queue-action" text="播放列表">
+                    <graphic><SvgIcon resource="/club/muimi/kimusic/icons/queue.svg" size="17.0" /></graphic>
+                </Button>
+            </HBox>
+        </VBox>
+    </bottom>
+</BorderPane>

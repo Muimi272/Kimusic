@@ -1,0 +1,62 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.kotlin
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Kimusic local files ###
+DEVELOPMENT.md
+.tmp-*/
+.tmp-*
+target/
+dist/
+release/
+*.jar
+*.exe
+*.msi
+*.deb
+*.AppImage
+*.zip
+*.tar.gz
+*.sha256
+
+!/.mvn/wrapper/maven-wrapper.jar
+!/src/main/resources/club/muimi/kimusic/tools/windows-x64/ncmdump.exe
+
+### Local IDE and build metadata ###
+.idea/
+*.log

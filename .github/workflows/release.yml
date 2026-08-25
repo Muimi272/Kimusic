@@ -1,0 +1,88 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build application
+        shell: pwsh
+        run: mvn -B package -DskipTests
+      - name: Prepare runtime input
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force staging/input, staging/classes | Out-Null
+          Copy-Item target/classes/* staging/classes -Recurse -Force
+          Remove-Item staging/classes/module-info.class -Force -ErrorAction SilentlyContinue
+          jar --create --file staging/input/Kimusic.jar --main-class club.muimi.kimusic.Launcher -C staging/classes .
+          mvn -B dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=staging/input
+      - name: Build Windows installers
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item staging/input/Kimusic.jar release/Kimusic-0.1.0.jar
+          jpackage --type exe --name Kimusic --app-version 0.1.0 --input staging/input --main-jar Kimusic.jar --main-class club.muimi.kimusic.Launcher --icon logo.ico --dest release --win-shortcut --win-menu
+          jpackage --type msi --name Kimusic --app-version 0.1.0 --input staging/input --main-jar Kimusic.jar --main-class club.muimi.kimusic.Launcher --icon logo.ico --dest release --win-shortcut --win-menu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release/*
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build application
+        run: mvn -B package -DskipTests
+      - name: Prepare runtime input
+        run: |
+          mkdir -p staging/input staging/classes
+          cp -r target/classes/* staging/classes/
+          rm -f staging/classes/module-info.class
+          jar --create --file staging/input/Kimusic.jar --main-class club.muimi.kimusic.Launcher -C staging/classes .
+          mvn -B dependency:copy-dependencies -DincludeScope=runtime -DoutputDirectory=staging/input
+      - name: Build Debian package and app image
+        run: |
+          mkdir -p release
+          cp staging/input/Kimusic.jar release/Kimusic-0.1.0.jar
+          jpackage --type deb --name Kimusic --app-version 0.1.0 --input staging/input --main-jar Kimusic.jar --main-class club.muimi.kimusic.Launcher --dest release
+          jpackage --type app-image --name Kimusic --app-version 0.1.0 --input staging/input --main-jar Kimusic.jar --main-class club.muimi.kimusic.Launcher --dest staging
+          curl -L --fail --output appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool.AppImage
+          ARCH=x86_64 ./appimagetool.AppImage staging/Kimusic release/Kimusic-x86_64.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: release/*
+
+  publish:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: true
+          files: release-files/**/*

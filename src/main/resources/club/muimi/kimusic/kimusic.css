@@ -1,0 +1,622 @@
+.app-root {
+    -fx-font-family: "Source Han Sans SC";
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-accent: #1aa79b;
+    -fx-focus-color: #1aa79b;
+    -fx-faint-focus-color: transparent;
+}
+
+.app-root .label,
+.app-root .button,
+.app-root .tree-cell,
+.app-root .list-cell,
+.app-root .table-cell,
+.app-root .column-header .label,
+.app-root .combo-box,
+.app-root .combo-box-popup .list-cell,
+.app-root .text-field,
+.app-root .choice-box,
+.context-menu .label,
+.menu-item .label,
+.dialog-pane .label,
+.dialog-pane .button,
+.dialog-pane .list-cell,
+.dialog-pane .text-field,
+.dialog-pane .combo-box,
+.dialog-pane .choice-box,
+.tooltip {
+    -fx-font-family: "Source Han Sans SC";
+    -fx-font-weight: bold;
+}
+
+.top-bar {
+    -fx-min-height: 58px;
+    -fx-pref-height: 58px;
+    -fx-padding: 0 18px;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.theme-light .top-bar,
+.theme-light .player-bar,
+.theme-light .queue-drawer {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #dfe5e4;
+}
+
+.theme-dark .top-bar,
+.theme-dark .player-bar,
+.theme-dark .queue-drawer {
+    -fx-background-color: #171a1b;
+    -fx-border-color: #343a3a;
+}
+
+.app-root .eyebrow,
+.app-root .time-label {
+    -fx-font-family: "JetBrains Mono SemiBold";
+}
+
+.eyebrow {
+    -fx-font-size: 9px;
+    -fx-opacity: 0.56;
+}
+
+.header-logo {
+    -fx-opacity: 0.96;
+}
+
+.sidebar {
+    -fx-padding: 18px 14px 14px 14px;
+    -fx-border-width: 0 1px 0 0;
+}
+
+.theme-light .sidebar {
+    -fx-background-color: #f4f6f5;
+    -fx-border-color: #dfe5e4;
+}
+
+.theme-dark .sidebar {
+    -fx-background-color: #202425;
+    -fx-border-color: #343a3a;
+}
+
+.workspace {
+    -fx-min-width: 0;
+}
+
+.workspace-split {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.workspace-split > .split-pane-divider {
+    -fx-padding: 0 3px;
+    -fx-background-color: transparent;
+    -fx-cursor: h-resize;
+}
+
+.workspace-split > .split-pane-divider:hover {
+    -fx-background-color: rgba(26, 167, 155, 0.25);
+}
+
+.track-pane {
+    -fx-padding: 24px 22px 18px 24px;
+}
+
+.visual-pane {
+    -fx-padding: 20px 28px 18px 28px;
+    -fx-border-width: 0 0 0 1px;
+}
+
+.theme-light .track-pane {
+    -fx-background-color: #fbfcfb;
+}
+
+.theme-light .visual-pane {
+    -fx-background-color: #eef2f0;
+    -fx-border-color: #dfe5e4;
+}
+
+.theme-dark .track-pane {
+    -fx-background-color: #111414;
+}
+
+.theme-dark .visual-pane {
+    -fx-background-color: #1b2020;
+    -fx-border-color: #343a3a;
+}
+
+.player-bar {
+    -fx-min-height: 112px;
+    -fx-padding: 5px 20px 13px 20px;
+    -fx-border-width: 1px 0 0 0;
+}
+
+.view-title {
+    -fx-font-size: 21px;
+    -fx-font-weight: bold;
+}
+
+.section-title,
+.now-title,
+.visual-title {
+    -fx-font-weight: bold;
+}
+
+.section-title {
+    -fx-font-size: 15px;
+}
+
+.section-title-small,
+.now-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.visual-title {
+    -fx-font-size: 17px;
+}
+
+.muted,
+.time-label,
+.empty-label {
+    -fx-opacity: 0.62;
+}
+
+.time-label {
+    -fx-font-size: 11px;
+}
+
+.playlist-heading {
+    -fx-padding: 8px 0 0 0;
+}
+
+.icon-action,
+.small-icon-action,
+.transport-action,
+.play-action {
+    -fx-background-color: transparent;
+    -fx-background-radius: 5px;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.icon-action {
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+}
+
+.small-icon-action {
+    -fx-min-width: 30px;
+    -fx-min-height: 30px;
+}
+
+.transport-action {
+    -fx-min-width: 40px;
+    -fx-min-height: 40px;
+}
+
+.play-action {
+    -fx-min-width: 46px;
+    -fx-min-height: 46px;
+    -fx-background-color: #1aa79b;
+}
+
+.icon-action:hover,
+.small-icon-action:hover,
+.transport-action:hover {
+    -fx-background-color: rgba(96, 114, 112, 0.15);
+}
+
+.play-action:hover {
+    -fx-background-color: #138e84;
+}
+
+.svg-stroke {
+    -fx-fill: transparent;
+    -fx-stroke-width: 1.8;
+    -fx-stroke-linecap: round;
+    -fx-stroke-linejoin: round;
+}
+
+.svg-fill {
+    -fx-fill: #26312f;
+}
+
+.theme-light .svg-stroke {
+    -fx-stroke: #26312f;
+}
+
+.theme-dark .svg-stroke {
+    -fx-stroke: #e7eceb;
+}
+
+.theme-dark .svg-fill {
+    -fx-fill: #e7eceb;
+}
+
+.play-action .svg-fill,
+.play-action .svg-stroke {
+    -fx-fill: white;
+    -fx-stroke: white;
+}
+
+.text-action,
+.accent-action,
+.lyrics-toggle,
+.queue-action {
+    -fx-background-radius: 5px;
+    -fx-padding: 7px 12px;
+    -fx-cursor: hand;
+}
+
+.text-action,
+.lyrics-toggle,
+.queue-action,
+.mode-action {
+    -fx-background-color: transparent;
+    -fx-border-color: rgba(112, 126, 125, 0.32);
+    -fx-border-radius: 5px;
+}
+
+.text-action:hover,
+.lyrics-toggle:hover,
+.queue-action:hover,
+.mode-action:hover {
+    -fx-background-color: rgba(96, 114, 112, 0.12);
+}
+
+.accent-action {
+    -fx-background-color: #1aa79b;
+    -fx-text-fill: white;
+}
+
+.accent-action:hover {
+    -fx-background-color: #138e84;
+}
+
+.lyrics-toggle:selected,
+.lyrics-toggle.active,
+.queue-action.active {
+    -fx-background-color: #1aa79b;
+    -fx-border-color: #1aa79b;
+    -fx-text-fill: white;
+}
+
+.lyrics-toggle.active .svg-stroke,
+.queue-action.active .svg-stroke,
+.theme-light .mode-action .svg-stroke {
+    -fx-stroke: #26312f;
+}
+
+.theme-dark .mode-action .svg-stroke {
+    -fx-stroke: #e7eceb;
+}
+
+.mode-action {
+    -fx-min-width: 38px;
+    -fx-min-height: 38px;
+    -fx-padding: 0;
+}
+
+.tree-view,
+.list-view,
+.table-view {
+    -fx-background-insets: 0;
+    -fx-background-radius: 5px;
+    -fx-border-radius: 5px;
+    -fx-border-width: 0;
+}
+
+.tree-view .tree-cell,
+.list-view .list-cell,
+.table-view .table-row-cell {
+    -fx-background-color: transparent;
+}
+
+.tree-view .tree-cell {
+    -fx-padding: 6px 5px;
+}
+
+.table-view .column-header-background,
+.table-view .column-header,
+.table-view .filler {
+    -fx-background-color: transparent;
+}
+
+.table-view .column-header {
+    -fx-border-width: 0 0 1px 0;
+    -fx-border-color: rgba(112, 126, 125, 0.22);
+}
+
+.table-view .table-cell {
+    -fx-padding: 9px 9px;
+    -fx-border-width: 0;
+}
+
+.table-row-cell:selected,
+.list-cell:selected,
+.tree-cell:selected {
+    -fx-background-color: rgba(26, 167, 155, 0.82);
+    -fx-text-fill: white;
+}
+
+.cover-shell {
+    -fx-background-radius: 7px;
+    -fx-border-radius: 7px;
+    -fx-border-width: 1px;
+}
+
+.theme-light .cover-shell {
+    -fx-background-color: #dfe7e3;
+    -fx-border-color: #cbd6d2;
+    -fx-effect: dropshadow(gaussian, rgba(20, 34, 31, 0.18), 28, 0.15, 0, 12);
+}
+
+.theme-dark .cover-shell {
+    -fx-background-color: #262d2c;
+    -fx-border-color: #3c4745;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 28, 0.2, 0, 12);
+}
+
+.cover-placeholder .svg-stroke {
+    -fx-stroke: #1aa79b;
+}
+
+.app-root .cover-placeholder-title {
+    -fx-font-family: "JetBrains Mono SemiBold";
+    -fx-font-size: 23px;
+    -fx-text-fill: #1aa79b;
+}
+
+#lyricsList {
+    -fx-background-color: transparent;
+}
+
+#lyricsList .list-cell {
+    -fx-alignment: center;
+    -fx-padding: 9px 20px;
+    -fx-background-color: transparent;
+    -fx-font-size: 14px;
+    -fx-opacity: 0.48;
+}
+
+#lyricsList .list-cell:selected {
+    -fx-text-fill: #1aa79b;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-opacity: 1;
+}
+
+.waveform-view {
+    -fx-min-height: 74px;
+    -fx-pref-height: 90px;
+}
+
+.visual-footer {
+    -fx-padding: 10px 14px 8px 14px;
+    -fx-background-radius: 8px;
+}
+
+.visual-pane.tone-dark .visual-title,
+.visual-pane.tone-dark .muted,
+.visual-pane.tone-dark .lyrics-toggle,
+.visual-pane.tone-dark #lyricsList .list-cell {
+    -fx-text-fill: #f4faf8;
+}
+
+.visual-pane.tone-dark .lyrics-toggle {
+    -fx-border-color: rgba(244, 250, 248, 0.46);
+}
+
+.visual-pane.tone-dark .lyrics-toggle .svg-stroke {
+    -fx-stroke: #f4faf8;
+}
+
+.visual-pane.tone-dark #lyricsList .list-cell:selected {
+    -fx-text-fill: #b8fff1;
+}
+
+.visual-pane.tone-light .visual-title,
+.visual-pane.tone-light .muted,
+.visual-pane.tone-light .lyrics-toggle,
+.visual-pane.tone-light #lyricsList .list-cell {
+    -fx-text-fill: #16201e;
+}
+
+.visual-pane.tone-light .lyrics-toggle {
+    -fx-border-color: rgba(22, 32, 30, 0.42);
+}
+
+.visual-pane.tone-light .lyrics-toggle .svg-stroke {
+    -fx-stroke: #16201e;
+}
+
+.visual-pane.tone-light #lyricsList .list-cell:selected {
+    -fx-text-fill: #087d72;
+}
+
+.queue-drawer {
+    -fx-padding: 20px 26px 24px 26px;
+    -fx-border-width: 1px 0 0 0;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.24), 24, 0.12, 0, -8);
+}
+
+.notice {
+    -fx-background-color: #b85265;
+    -fx-background-radius: 5px;
+    -fx-padding: 7px 12px;
+    -fx-text-fill: white;
+}
+
+.kimusic-dialog {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.kimusic-dialog.theme-light,
+.kimusic-dialog.theme-light > .content,
+.kimusic-dialog.theme-light > .button-bar > .container {
+    -fx-background-color: #fbfcfb;
+}
+
+.kimusic-dialog.theme-dark,
+.kimusic-dialog.theme-dark > .content,
+.kimusic-dialog.theme-dark > .button-bar > .container {
+    -fx-background-color: #171a1b;
+}
+
+.kimusic-dialog > .button-bar > .container {
+    -fx-padding: 8px 24px 20px 24px;
+}
+
+.kimusic-dialog > .button-bar .button {
+    -fx-background-radius: 5px;
+    -fx-padding: 8px 18px;
+    -fx-cursor: hand;
+}
+
+.kimusic-dialog > .button-bar .button:default {
+    -fx-background-color: #1aa79b;
+    -fx-text-fill: white;
+}
+
+.settings-content {
+    -fx-padding: 22px 24px 6px 24px;
+}
+
+.settings-heading {
+    -fx-padding: 0 0 6px 0;
+}
+
+.settings-title {
+    -fx-font-size: 20px;
+}
+
+.settings-section {
+    -fx-padding: 15px 16px;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1px;
+}
+
+.theme-light .settings-section {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #dfe5e4;
+}
+
+.theme-dark .settings-section {
+    -fx-background-color: #202425;
+    -fx-border-color: #343a3a;
+}
+
+.settings-section-title {
+    -fx-font-size: 11px;
+    -fx-opacity: 0.58;
+}
+
+.settings-label {
+    -fx-font-size: 13px;
+}
+
+.settings-value {
+    -fx-font-family: "JetBrains Mono SemiBold";
+    -fx-text-fill: #1aa79b;
+}
+
+.segmented-control {
+    -fx-padding: 3px;
+    -fx-background-radius: 5px;
+}
+
+.theme-light .segmented-control {
+    -fx-background-color: #edf1ef;
+}
+
+.theme-dark .segmented-control {
+    -fx-background-color: #151919;
+}
+
+.segment-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 4px;
+    -fx-padding: 6px 14px;
+    -fx-cursor: hand;
+}
+
+.segment-button:selected {
+    -fx-background-color: #1aa79b;
+    -fx-text-fill: white;
+}
+
+.slider .track {
+    -fx-pref-height: 4px;
+    -fx-min-height: 4px;
+    -fx-background-radius: 3px;
+}
+
+.slider .colored-track {
+    -fx-pref-height: 4px;
+    -fx-min-height: 4px;
+    -fx-background-color: #1aa79b;
+    -fx-background-radius: 3px;
+}
+
+.theme-light .slider .track {
+    -fx-background-color: #d6dedb;
+}
+
+.theme-dark .slider .track {
+    -fx-background-color: #3b4543;
+}
+
+.theme-light .slider .colored-track,
+.theme-dark .slider .colored-track {
+    -fx-background-color: #1aa79b;
+}
+
+#progressSlider {
+    -fx-cursor: open-hand;
+}
+
+#progressSlider:pressed {
+    -fx-cursor: closed-hand;
+}
+
+.slider .thumb {
+    -fx-background-color: #1aa79b;
+    -fx-pref-width: 11px;
+    -fx-pref-height: 11px;
+}
+
+.scroll-bar:vertical {
+    -fx-pref-width: 0;
+    -fx-min-width: 0;
+    -fx-max-width: 0;
+    -fx-opacity: 0;
+}
+
+.scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+    -fx-opacity: 0;
+}
+
+.scroll-bar:vertical .thumb,
+.scroll-bar:vertical .track,
+.scroll-bar:vertical .increment-button,
+.scroll-bar:vertical .decrement-button {
+    -fx-pref-width: 0;
+    -fx-min-width: 0;
+    -fx-max-width: 0;
+    -fx-padding: 0;
+}
+
+#queueList .list-cell:playing {
+    -fx-background-color: rgba(26, 167, 155, 0.14);
+    -fx-effect: dropshadow(gaussian, rgba(26, 167, 155, 0.48), 13, 0.28, 0, 2);
+    -fx-border-color: rgba(26, 167, 155, 0.58);
+    -fx-border-width: 0 0 0 3px;
+}
