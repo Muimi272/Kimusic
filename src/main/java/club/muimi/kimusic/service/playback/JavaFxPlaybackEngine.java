@@ -28,12 +28,15 @@ final class JavaFxPlaybackEngine implements PlaybackEngine {
         created.setAudioSpectrumThreshold(-60);
         created.setAudioSpectrumListener((timestamp, duration, magnitudes, phases) -> {
             if (!closed && player == created) {
-                float[] normalized = new float[magnitudes.length];
+                float[] waveform = new float[magnitudes.length];
+                float[] spectrum = new float[magnitudes.length];
                 for (int index = 0; index < magnitudes.length; index++) {
-                    normalized[index] = Math.max(0, Math.min(1, (magnitudes[index] + 60) / 60));
+                    double db = Math.max(-60, Math.min(0, magnitudes[index]));
+                    spectrum[index] = (float) Math.pow(10, db / 20.0);
+                    waveform[index] = (float) ((db + 60) / 60.0);
                 }
                 listener.onProgress(created.getCurrentTime().toSeconds(),
-                        new VisualizationFrame(normalized, normalized));
+                        new VisualizationFrame(waveform, spectrum, 20_000.0, true));
             }
         });
         created.setOnReady(() -> {

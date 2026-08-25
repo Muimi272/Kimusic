@@ -1,8 +1,13 @@
 package club.muimi.kimusic.service.playback;
 
-public record VisualizationFrame(float[] waveform, float[] spectrum, double maxFrequencyHz) {
+public record VisualizationFrame(float[] waveform, float[] spectrum,
+                                 double maxFrequencyHz, boolean spectrumIsBandAggregated) {
     public VisualizationFrame(float[] waveform, float[] spectrum) {
-        this(waveform, spectrum, 20_000.0);
+        this(waveform, spectrum, 20_000.0, false);
+    }
+
+    public VisualizationFrame(float[] waveform, float[] spectrum, double maxFrequencyHz) {
+        this(waveform, spectrum, maxFrequencyHz, false);
     }
 
     public VisualizationFrame {
@@ -23,6 +28,6 @@ public record VisualizationFrame(float[] waveform, float[] spectrum, double maxF
     }
 
     public static VisualizationFrame empty() {
-        return new VisualizationFrame(new float[64], new float[64], 20_000.0);
+        return new VisualizationFrame(new float[64], new float[64], 20_000.0, false);
     }
 }
