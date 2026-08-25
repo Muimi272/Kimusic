@@ -63,10 +63,12 @@ public final class WaveformView extends Region {
             return;
         }
         for (int index = 0; index < spectrum.length; index++) {
-            int source = Math.min(values.length - 1,
-                    (int) ((long) index * values.length / spectrum.length));
+            double normalized = (double) index / spectrum.length;
+            double freq = 20.0 * Math.pow(20000.0 / 20.0, normalized);
+            int source = (int) (freq / (20000.0 / values.length));
+            source = Math.min(values.length - 1, Math.max(0, source));
             // Preserve headroom so dense peaks can be normalized during drawing.
-            float value = Math.max(0, Math.min(4, values[source]));
+            float value = Math.max(0, Math.min(20, values[source]));
             spectrum[index] += (value - spectrum[index]) * (value > spectrum[index] ? 0.62f : 0.2f);
             spectrumPeaks[index] = Math.max(spectrum[index], spectrumPeaks[index] - 0.018f);
         }
@@ -151,11 +153,17 @@ public final class WaveformView extends Region {
         displayScale = Math.max(0.35, Math.min(6.0, displayScale));
         for (int index = 0; index < spectrum.length; index++) {
             double x = index * width / spectrum.length;
-            double magnitude = Math.max(0.025, Math.min(1.0, spectrum[index] * displayScale));
+            float raw = (float) (spectrum[index] * displayScale);
+            double db = 20 * Math.log10(raw + 1e-12);
+            double normalized = (db + 120) / 120;
+            double magnitude = Math.max(0.025, Math.min(1.0, normalized));
             double barHeight = Math.max(3, magnitude * (height - 13));
             graphics.setFill(Color.web("#1aa79b", 0.9));
             graphics.fillRoundRect(x, height - barHeight, bandWidth, barHeight, 3, 3);
-            double peakMagnitude = Math.min(1.0, spectrumPeaks[index] * displayScale);
+            float peakRaw = (float) (spectrumPeaks[index] * displayScale);
+            double peakDb = 20 * Math.log10(peakRaw + 1e-12);
+            double peakNormalized = (peakDb + 120) / 120;
+            double peakMagnitude = Math.max(0.025, Math.min(1.0, peakNormalized));
             double peakY = height - Math.max(3, peakMagnitude * (height - 13));
             graphics.setFill(Color.web("#8be0d5", 0.86));
             graphics.fillRoundRect(x, peakY, bandWidth, 2, 2, 2);
