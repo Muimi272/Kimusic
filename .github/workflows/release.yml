@@ -67,7 +67,7 @@ jobs:
           jpackage --type app-image --name Kimusic --app-version 0.1.0 --input staging/input --main-jar Kimusic.jar --main-class club.muimi.kimusic.Launcher --dest staging
           curl -L --fail --output appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool.AppImage
-          ARCH=x86_64 ./appimagetool.AppImage staging/Kimusic release/Kimusic-x86_64.AppImage
+          ARCH=x86_64 ./appimagetool.AppImage --appimage-extract-and-run staging/Kimusic release/Kimusic-x86_64.AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: linux-release
