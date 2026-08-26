@@ -7,7 +7,15 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.SourceDataLine;
 import org.jflac.sound.spi.Flac2PcmAudioInputStream;
+import org.jflac.FLACDecoder;
+import org.jflac.frame.Frame;
+import org.jflac.io.RandomFileInputStream;
+import org.jflac.metadata.StreamInfo;
+import org.jflac.util.ByteData;
+
+import java.io.Closeable;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Map;
 
 final class JavaSoundPlaybackEngine implements PlaybackEngine {
@@ -18,6 +26,7 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
     private volatile double requestedSeek = -1;
     private volatile SourceDataLine line;
     private volatile AudioInputStream stream;
+    private volatile Closeable randomInput;
 
     @Override
     public void open(Path track, PlaybackListener listener, double initialVolume, boolean autoPlay) {
@@ -49,8 +58,8 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
 
     @Override
     public void seek(double seconds) {
-        requestedSeek = Math.max(0, seconds);
         synchronized (pauseLock) {
+            requestedSeek = Math.max(0, seconds);
             pauseLock.notifyAll();
         }
     }
@@ -74,15 +83,20 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
         try {
             double duration = readDuration(track);
             listener.onReady(duration);
-            listener.onPlayingChanged(!paused);
             while (!closed) {
-                requestedSeek = -1;
-                boolean reachedEnd = playFrom(track, listener, startSeconds);
+                double pending = takeRequestedSeek();
+                if (pending >= 0) {
+                    startSeconds = duration > 0 ? Math.min(duration, pending) : pending;
+                }
+                boolean reachedEnd = isFlac(track)
+                        ? playFlac(track, listener, startSeconds)
+                        : playFrom(track, listener, startSeconds);
                 if (closed) {
                     return;
                 }
-                if (requestedSeek >= 0) {
-                    startSeconds = Math.min(duration, requestedSeek);
+                pending = takeRequestedSeek();
+                if (pending >= 0) {
+                    startSeconds = duration > 0 ? Math.min(duration, pending) : pending;
                     continue;
                 }
                 if (reachedEnd) {
@@ -97,6 +111,163 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
         } finally {
             closeCurrentResources();
         }
+    }
+
+    private boolean playFlac(Path track, PlaybackListener listener, double startSeconds) throws Exception {
+        try (RandomFileInputStream input = new RandomFileInputStream(track.toFile())) {
+            randomInput = input;
+            FLACDecoder decoder = new FLACDecoder(input);
+            decoder.readMetadata();
+            StreamInfo info = decoder.getStreamInfo();
+            if (info == null || info.getSampleRate() <= 0 || info.getChannels() <= 0) {
+                throw new IllegalArgumentException("FLAC stream metadata is incomplete");
+            }
+            int outputChannels = Math.min(2, info.getChannels());
+            AudioFormat outputFormat = selectDirectOutputFormat(info.getSampleRate(), outputChannels);
+            SourceDataLine output = (SourceDataLine) AudioSystem.getLine(
+                    new DataLine.Info(SourceDataLine.class, outputFormat));
+            line = output;
+            output.open(outputFormat, 16_384);
+            if (!paused) {
+                output.start();
+            }
+            listener.onPlayingChanged(!paused);
+
+            long totalSamples = info.getTotalSamples();
+            long currentSample = 0;
+            if (startSeconds > 0 && totalSamples > 0) {
+                long desired = Math.min(totalSamples - 1,
+                        Math.max(0, Math.round(startSeconds * info.getSampleRate())));
+                currentSample = decoder.seek(desired);
+            }
+            ByteData pcm = null;
+            byte[] converted = new byte[Math.max(16_384,
+                    info.getMaxBlockSize() * outputFormat.getFrameSize())];
+            while (!closed) {
+                awaitIfPaused(listener);
+                if (closed) {
+                    return false;
+                }
+                double pending = takeRequestedSeek();
+                if (pending >= 0) {
+                    output.flush();
+                    long desired = totalSamples > 0
+                            ? Math.min(totalSamples - 1,
+                            Math.max(0, Math.round(pending * info.getSampleRate())))
+                            : Math.max(0, Math.round(pending * info.getSampleRate()));
+                    currentSample = decoder.seek(desired);
+                    continue;
+                }
+                Frame frame = decoder.readNextFrame();
+                if (frame == null) {
+                    output.drain();
+                    return true;
+                }
+                pcm = decoder.decodeFrame(frame, pcm);
+                int outputBytes = convertFlacToPcm16(pcm.getData(), pcm.getLen(),
+                        info.getBitsPerSample(), info.getChannels(), outputChannels, converted);
+                VisualizationFrame visualization = analyzeAndApplyVolume(
+                        converted, outputBytes, outputChannels, info.getSampleRate() / 2.0);
+                output.write(converted, 0, outputBytes);
+                currentSample += outputBytes / outputFormat.getFrameSize();
+                listener.onProgress(currentSample / (double) info.getSampleRate(), visualization);
+            }
+            return false;
+        } finally {
+            randomInput = null;
+            closeCurrentResources();
+        }
+    }
+
+    private AudioFormat selectDirectOutputFormat(float sampleRate, int channels) {
+        float[] rates = {sampleRate, Math.min(sampleRate, 48_000), 48_000, 44_100, 96_000};
+        for (float rate : rates) {
+            if (rate != sampleRate) {
+                continue;
+            }
+            AudioFormat candidate = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED,
+                    rate, 16, channels, channels * 2, rate, false);
+            if (AudioSystem.isLineSupported(new DataLine.Info(SourceDataLine.class, candidate))) {
+                return candidate;
+            }
+        }
+        throw new IllegalArgumentException("No direct audio output line for FLAC at " + sampleRate + " Hz");
+    }
+
+    int convertFlacToPcm16(byte[] input, int length, int bitsPerSample,
+                           int sourceChannels, int outputChannels, byte[] output) {
+        int bytesPerSample = Math.max(1, (bitsPerSample + 7) / 8);
+        int frameSize = bytesPerSample * sourceChannels;
+        int frames = length / frameSize;
+        int required = frames * outputChannels * 2;
+        if (required > output.length) {
+            throw new IllegalArgumentException("FLAC frame exceeds the playback buffer");
+        }
+        for (int frame = 0; frame < frames; frame++) {
+            long left = 0;
+            long right = 0;
+            int leftCount = 0;
+            int rightCount = 0;
+            for (int channel = 0; channel < sourceChannels; channel++) {
+                int sample = readFlacSample(input, frame * frameSize + channel * bytesPerSample,
+                        bitsPerSample);
+                if (outputChannels == 1 || (channel & 1) == 0) {
+                    left += sample;
+                    leftCount++;
+                } else {
+                    right += sample;
+                    rightCount++;
+                }
+            }
+            int mixedLeft = (int) (left / Math.max(1, leftCount));
+            int offset = frame * outputChannels * 2;
+            writePcm16(output, offset, mixedLeft);
+            if (outputChannels == 2) {
+                int mixedRight = rightCount == 0 ? mixedLeft : (int) (right / rightCount);
+                writePcm16(output, offset + 2, mixedRight);
+            }
+        }
+        return required;
+    }
+
+    private int readFlacSample(byte[] data, int offset, int bitsPerSample) {
+        return switch (bitsPerSample) {
+            case 8 -> ((data[offset] & 0xff) - 128) << 8;
+            case 16 -> (short) ((data[offset] & 0xff) | (data[offset + 1] << 8));
+            case 24 -> {
+                int value = (data[offset] & 0xff) | ((data[offset + 1] & 0xff) << 8)
+                        | (data[offset + 2] << 16);
+                yield value >> 8;
+            }
+            default -> throw new IllegalArgumentException("Unsupported FLAC bit depth: " + bitsPerSample);
+        };
+    }
+
+    private void writePcm16(byte[] output, int offset, int value) {
+        int bounded = Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, value));
+        output[offset] = (byte) bounded;
+        output[offset + 1] = (byte) (bounded >>> 8);
+    }
+
+    double takeRequestedSeek() {
+        synchronized (pauseLock) {
+            double pending = requestedSeek;
+            requestedSeek = -1;
+            return pending;
+        }
+    }
+
+    private void restoreRequestedSeek(double seconds) {
+        synchronized (pauseLock) {
+            if (requestedSeek < 0) {
+                requestedSeek = seconds;
+            }
+            pauseLock.notifyAll();
+        }
+    }
+
+    private boolean isFlac(Path track) {
+        return track.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".flac");
     }
 
     private boolean playFrom(Path track, PlaybackListener listener, double startSeconds) throws Exception {
@@ -117,12 +288,28 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
                     if (!paused) {
                         output.start();
                     }
+                    listener.onPlayingChanged(!paused);
                     byte[] buffer = new byte[downmix ? 8_192 + decoderFormat.getFrameSize() : 8_192];
                     byte[] outputBuffer = downmix ? new byte[8_192] : buffer;
                     long frames = 0;
-                    while (!closed && requestedSeek < 0) {
+                    while (!closed) {
                         awaitIfPaused(listener);
-                        if (closed || requestedSeek >= 0) {
+                        if (closed) {
+                            break;
+                        }
+                        double pending = takeRequestedSeek();
+                        if (pending >= 0) {
+                            double current = startSeconds + frames / outputFormat.getFrameRate();
+                            if (pending >= current) {
+                                output.flush();
+                                skipTo(playable, downmix ? decoderFormat : outputFormat,
+                                        pending - current);
+                                startSeconds = pending;
+                                frames = 0;
+                                listener.onProgress(pending, VisualizationFrame.empty());
+                                continue;
+                            }
+                            restoreRequestedSeek(pending);
                             break;
                         }
                         int read = playable.read(buffer, 0, buffer.length);
@@ -398,6 +585,15 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
                 activeStream.close();
             } catch (Exception ignored) {
                 // Closing is best effort during a track switch.
+            }
+        }
+        Closeable activeInput = randomInput;
+        randomInput = null;
+        if (activeInput != null) {
+            try {
+                activeInput.close();
+            } catch (Exception ignored) {
+                // Closing is best effort during a FLAC seek or track switch.
             }
         }
     }

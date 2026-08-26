@@ -1,6 +1,7 @@
 package club.muimi.kimusic.model;
 
 import club.muimi.kimusic.status.VisualizationMode;
+import club.muimi.kimusic.status.Language;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -21,6 +22,10 @@ public final class AppState implements Serializable {
     private final boolean darkTheme;
     private final double volume;
     private final VisualizationMode visualizationMode;
+    private final Language language;
+    private final String lyricHighlightColor;
+    private final Boolean autoDecodeNcm;
+    private final int lyricsFontSize;
 
     public AppState(List<String> libraryRoots, Map<String, List<String>> playlists,
                     List<String> queue, boolean darkTheme, double volume) {
@@ -36,6 +41,21 @@ public final class AppState implements Serializable {
     public AppState(List<String> libraryRoots, Map<String, List<String>> playlists,
                     List<String> queue, boolean darkTheme, double volume,
                     VisualizationMode visualizationMode, String lastTrack) {
+        this(libraryRoots, playlists, queue, darkTheme, volume, visualizationMode,
+                lastTrack, Language.CHINESE);
+    }
+
+    public AppState(List<String> libraryRoots, Map<String, List<String>> playlists,
+                    List<String> queue, boolean darkTheme, double volume,
+                    VisualizationMode visualizationMode, String lastTrack, Language language) {
+        this(libraryRoots, playlists, queue, darkTheme, volume, visualizationMode,
+                lastTrack, language, "#1AA79B", true, 14);
+    }
+
+    public AppState(List<String> libraryRoots, Map<String, List<String>> playlists,
+                    List<String> queue, boolean darkTheme, double volume,
+                    VisualizationMode visualizationMode, String lastTrack, Language language,
+                    String lyricHighlightColor, boolean autoDecodeNcm, int lyricsFontSize) {
         this.version = 1;
         this.libraryRoots = new ArrayList<>(libraryRoots);
         this.playlists = new LinkedHashMap<>();
@@ -46,6 +66,10 @@ public final class AppState implements Serializable {
         this.volume = Math.max(0, Math.min(1, volume));
         this.visualizationMode = visualizationMode == null
                 ? VisualizationMode.WAVEFORM : visualizationMode;
+        this.language = language == null ? Language.CHINESE : language;
+        this.lyricHighlightColor = normalizeColor(lyricHighlightColor);
+        this.autoDecodeNcm = autoDecodeNcm;
+        this.lyricsFontSize = Math.max(11, Math.min(24, lyricsFontSize));
     }
 
     public static AppState empty() {
@@ -84,5 +108,28 @@ public final class AppState implements Serializable {
 
     public VisualizationMode getVisualizationMode() {
         return visualizationMode == null ? VisualizationMode.WAVEFORM : visualizationMode;
+    }
+
+    public Language getLanguage() {
+        return language == null ? Language.CHINESE : language;
+    }
+
+    public String getLyricHighlightColor() {
+        return normalizeColor(lyricHighlightColor);
+    }
+
+    public boolean isAutoDecodeNcm() {
+        return autoDecodeNcm == null || autoDecodeNcm;
+    }
+
+    public int getLyricsFontSize() {
+        return lyricsFontSize >= 11 && lyricsFontSize <= 24 ? lyricsFontSize : 14;
+    }
+
+    private static String normalizeColor(String value) {
+        if (value != null && value.matches("#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?")) {
+            return value.toUpperCase();
+        }
+        return "#1AA79B";
     }
 }

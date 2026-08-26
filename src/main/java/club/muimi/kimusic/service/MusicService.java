@@ -5,6 +5,7 @@ import club.muimi.kimusic.service.playback.PlaybackEngines;
 import club.muimi.kimusic.service.playback.PlaybackListener;
 import club.muimi.kimusic.service.playback.VisualizationFrame;
 import club.muimi.kimusic.status.PlayMode;
+import club.muimi.kimusic.status.Language;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
@@ -31,9 +32,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 
 public final class MusicService {
     private final NoticeService noticeService;
+    private final Function<PlaybackEngines.Backend, PlaybackEngine> engineFactory;
     private final ArtworkService artworkService = new ArtworkService();
     private final NcmDumpService ncmDumpService = new NcmDumpService();
     private final ObservableList<Path> queue = FXCollections.observableArrayList();
@@ -49,6 +52,7 @@ public final class MusicService {
             new SimpleObjectProperty<>(VisualizationFrame.empty());
 
     private PlaybackEngine engine;
+    private PlaybackEngine outgoingEngine;
     private PlaybackEngines.Backend backend;
     private PauseTransition loadingTimeout;
     private Timeline volumeFade;
@@ -56,9 +60,18 @@ public final class MusicService {
     private boolean fallbackAttempted;
     private boolean engineReady;
     private boolean playbackEnded;
+    private boolean autoDecodeNcm = true;
+    private boolean pausePending;
+    private Language language = Language.CHINESE;
 
     private MusicService(NoticeService noticeService) {
+        this(noticeService, PlaybackEngines::create);
+    }
+
+    MusicService(NoticeService noticeService,
+                 Function<PlaybackEngines.Backend, PlaybackEngine> engineFactory) {
         this.noticeService = noticeService;
+        this.engineFactory = engineFactory;
         volume.addListener((observable, oldValue, newValue) -> {
             double bounded = Math.max(0, Math.min(1, newValue.doubleValue()));
             if (bounded != newValue.doubleValue()) {
@@ -68,6 +81,7 @@ public final class MusicService {
                     volumeFade.stop();
                     volumeFade = null;
                 }
+                closeOutgoingEngine();
                 engine.setVolume(bounded);
             }
         });
@@ -90,7 +104,8 @@ public final class MusicService {
 
     public void open(Path track) {
         if (track == null || !Files.isRegularFile(track)) {
-            noticeService.addNotice("所选音频文件已不存在。");
+            noticeService.addError(language == Language.ENGLISH
+                    ? "The selected audio file no longer exists." : "所选音频文件已不存在。");
             return;
         }
         Path normalized = track.toAbsolutePath().normalize();
@@ -114,13 +129,30 @@ public final class MusicService {
             if (currentIndex.get() >= 0) {
                 openAt(currentIndex.get(), true);
             } else {
-                noticeService.addNotice("请先导入音乐。");
+                noticeService.addWarning(language == Language.ENGLISH
+                        ? "Import some music first." : "请先导入音乐。");
             }
             return;
         }
-        if (playing.get()) {
-            engine.pause();
+        if (pausePending) {
+            pausePending = false;
+            if (volumeFade != null) {
+                volumeFade.stop();
+                volumeFade = null;
+            }
+            fadeEngine(engine, 0, volume.get(), 90, null);
+        } else if (playing.get()) {
+            PlaybackEngine active = engine;
+            pausePending = true;
+            fadeEngine(active, volume.get(), 0, 90, () -> {
+                if (active == engine) {
+                    pausePending = false;
+                    active.pause();
+                    active.setVolume(volume.get());
+                }
+            });
         } else {
+            engine.setVolume(0);
             engine.play();
         }
     }
@@ -134,7 +166,7 @@ public final class MusicService {
             return;
         }
         if (engine != null && currentSeconds.get() > 3) {
-            engine.seek(0);
+            seekToSeconds(0);
             return;
         }
         int target = currentIndex.get() - 1;
@@ -167,8 +199,18 @@ public final class MusicService {
 
     public void seekToFraction(double fraction) {
         if (engine != null && durationSeconds.get() > 0) {
-            engine.seek(durationSeconds.get() * Math.max(0, Math.min(1, fraction)));
+            seekToSeconds(durationSeconds.get() * Math.max(0, Math.min(1, fraction)));
         }
+    }
+
+    public void seekToSeconds(double seconds) {
+        if (engine == null) {
+            return;
+        }
+        double target = Math.max(0, durationSeconds.get() > 0
+                ? Math.min(durationSeconds.get(), seconds) : seconds);
+        currentSeconds.set(target);
+        engine.seek(target);
     }
 
     public void dispose() {
@@ -216,24 +258,43 @@ public final class MusicService {
         return volume;
     }
 
+    public void setLanguage(Language language) {
+        this.language = language == null ? Language.CHINESE : language;
+    }
+
+    public void setAutoDecodeNcm(boolean autoDecodeNcm) {
+        this.autoDecodeNcm = autoDecodeNcm;
+    }
+
+    public boolean isAutoDecodeNcm() {
+        return autoDecodeNcm;
+    }
+
     private void openAt(int index, boolean autoPlay) {
         if (index < 0 || index >= queue.size()) {
             return;
         }
         playbackSession++;
         long session = playbackSession;
-        disposeEngine();
+        prepareEngineSwitch(autoPlay);
         Path track = queue.get(index);
         currentIndex.set(index);
         currentTrack.set(track);
         currentSeconds.set(0);
         durationSeconds.set(0);
-        artwork.set(null);
         visualization.set(VisualizationFrame.empty());
         fallbackAttempted = false;
         playbackEnded = false;
         if (isNcm(track)) {
-            prepareNcm(track, autoPlay, session);
+            if (autoDecodeNcm) {
+                prepareNcm(track, autoPlay, session);
+            } else {
+                playing.set(false);
+                closeOutgoingEngine();
+                noticeService.addWarning(language == Language.ENGLISH
+                        ? "Automatic NCM decoding is disabled in Playback settings."
+                        : "播放设置中已关闭自动解码 NCM。");
+            }
         } else {
             loadArtwork(track, session);
             startEngine(track, track, autoPlay, session, PlaybackEngines.preferredBackend(track));
@@ -241,7 +302,6 @@ public final class MusicService {
     }
 
     private void prepareNcm(Path source, boolean autoPlay, long session) {
-        noticeService.addNotice("正在解码「" + source.getFileName() + "」…");
         Thread.ofVirtual().name("kimusic-ncmdump").start(() -> {
             try {
                 Path decoded = ncmDumpService.decode(source);
@@ -255,12 +315,14 @@ public final class MusicService {
             } catch (Exception exception) {
                 runForSession(session, () -> {
                     playing.set(false);
+                    closeOutgoingEngine();
                     currentTrack.set(null);
                     currentSeconds.set(0);
                     durationSeconds.set(0);
                     artwork.set(null);
-                    noticeService.addNotice("无法解码「" + source.getFileName()
-                            + "」，请确认文件完整且 ncmdump 可用。");
+                    noticeService.addError(language == Language.ENGLISH
+                            ? "Unable to decode \"" + source.getFileName() + "\". Check that the file is intact."
+                            : "无法解码「" + source.getFileName() + "」，请确认文件完整。");
                 });
             }
         });
@@ -270,10 +332,11 @@ public final class MusicService {
                              PlaybackEngines.Backend selectedBackend) {
         backend = selectedBackend;
         engineReady = false;
-        engine = PlaybackEngines.create(selectedBackend);
+        engine = engineFactory.apply(selectedBackend);
         PlaybackEngine activeEngine = engine;
         try {
-            activeEngine.open(playbackTrack, listenerFor(session, displayTrack, playbackTrack, autoPlay),
+            activeEngine.open(playbackTrack, listenerFor(
+                            session, displayTrack, playbackTrack, autoPlay, activeEngine),
                     autoPlay ? 0 : volume.get(), autoPlay);
             startLoadingTimeout(session, displayTrack, playbackTrack, autoPlay);
         } catch (Throwable error) {
@@ -281,7 +344,8 @@ public final class MusicService {
         }
     }
 
-    private PlaybackListener listenerFor(long session, Path displayTrack, Path playbackTrack, boolean autoPlay) {
+    private PlaybackListener listenerFor(long session, Path displayTrack, Path playbackTrack,
+                                         boolean autoPlay, PlaybackEngine activeEngine) {
         return new PlaybackListener() {
             @Override
             public void onReady(double duration) {
@@ -303,8 +367,20 @@ public final class MusicService {
             @Override
             public void onPlayingChanged(boolean value) {
                 runForSession(session, () -> {
+                    if (engine != activeEngine) {
+                        return;
+                    }
+                    if (!value) {
+                        pausePending = false;
+                    }
                     playing.set(value);
-                    fadeVolume(value ? volume.get() : 0);
+                    if (value) {
+                        if (outgoingEngine != null) {
+                            crossfadeTo(activeEngine);
+                        } else {
+                            fadeEngine(activeEngine, 0, volume.get(), 110, null);
+                        }
+                    }
                 });
             }
 
@@ -337,51 +413,86 @@ public final class MusicService {
         stopLoadingTimeout();
         if (backend == PlaybackEngines.Backend.JAVA_SOUND && !fallbackAttempted) {
             fallbackAttempted = true;
+            if (volumeFade != null) {
+                volumeFade.stop();
+                volumeFade = null;
+            }
+            if (outgoingEngine != null) {
+                outgoingEngine.setVolume(volume.get());
+            }
             if (engine != null) {
                 engine.close();
             }
             startEngine(playbackTrack, displayTrack, autoPlay, session, PlaybackEngines.Backend.JAVA_FX);
             return;
         }
-        playing.set(false);
+        disposeEngine();
         currentTrack.set(null);
         currentSeconds.set(0);
         durationSeconds.set(0);
         artwork.set(null);
-        noticeService.addNotice("无法播放「" + displayTrack.getFileName() + "」，文件可能损坏或编码不受支持。");
+        noticeService.addError(language == Language.ENGLISH
+                ? "Unable to play \"" + displayTrack.getFileName() + "\". The file may be damaged or unsupported."
+                : "无法播放「" + displayTrack.getFileName() + "」，文件可能损坏或编码不受支持。");
     }
 
-    private void fadeVolume(double target) {
-        if (engine == null) {
+    private void crossfadeTo(PlaybackEngine activeEngine) {
+        PlaybackEngine oldEngine = outgoingEngine;
+        if (oldEngine == null) {
+            fadeEngine(activeEngine, 0, volume.get(), 110, null);
             return;
         }
         if (volumeFade != null) {
             volumeFade.stop();
         }
-        double current = target == 0 ? volume.get() : 0;
-        VolumeProperty fadingVolume = new VolumeProperty(current);
+        EngineVolumeProperty incoming = new EngineVolumeProperty(activeEngine, 0);
+        EngineVolumeProperty outgoing = new EngineVolumeProperty(oldEngine, volume.get());
         volumeFade = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(fadingVolume, current)),
-                new KeyFrame(Duration.millis(120), event -> {
-                    if (engine != null) {
-                        engine.setVolume(target);
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(incoming, 0), new KeyValue(outgoing, volume.get())),
+                new KeyFrame(Duration.millis(180), event -> {
+                    activeEngine.setVolume(volume.get());
+                    oldEngine.close();
+                    if (outgoingEngine == oldEngine) {
+                        outgoingEngine = null;
                     }
                     volumeFade = null;
+                }, new KeyValue(incoming, volume.get()), new KeyValue(outgoing, 0)));
+        volumeFade.play();
+    }
+
+    private void fadeEngine(PlaybackEngine targetEngine, double from, double target,
+                            double millis, Runnable after) {
+        if (targetEngine == null) {
+            return;
+        }
+        if (volumeFade != null) {
+            volumeFade.stop();
+        }
+        EngineVolumeProperty fadingVolume = new EngineVolumeProperty(targetEngine, from);
+        volumeFade = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(fadingVolume, from)),
+                new KeyFrame(Duration.millis(millis), event -> {
+                    targetEngine.setVolume(target);
+                    volumeFade = null;
+                    if (after != null) {
+                        after.run();
+                    }
                 }, new KeyValue(fadingVolume, target)));
         volumeFade.play();
     }
 
-    /** Adapter property used solely to interpolate a backend volume value. */
-    private final class VolumeProperty extends javafx.beans.property.SimpleDoubleProperty {
-        private VolumeProperty(double initial) {
+    private static final class EngineVolumeProperty extends javafx.beans.property.SimpleDoubleProperty {
+        private final PlaybackEngine targetEngine;
+
+        private EngineVolumeProperty(PlaybackEngine targetEngine, double initial) {
             super(initial);
+            this.targetEngine = targetEngine;
         }
 
         @Override
         protected void invalidated() {
-            if (engine != null) {
-                engine.setVolume(get());
-            }
+            targetEngine.setVolume(get());
         }
     }
 
@@ -441,13 +552,42 @@ public final class MusicService {
     }
 
     private void loadArtwork(Path track, long session) {
-        Thread.ofVirtual().name("kimusic-artwork-loader").start(() ->
-                artworkService.load(track).ifPresent(image ->
-                        runForSession(session, () -> artwork.set(image))));
+        Thread.ofVirtual().name("kimusic-artwork-loader").start(() -> {
+            Image image = artworkService.load(track).orElse(null);
+            runForSession(session, () -> artwork.set(image));
+        });
+    }
+
+    private void prepareEngineSwitch(boolean autoPlay) {
+        stopLoadingTimeout();
+        pausePending = false;
+        if (volumeFade != null) {
+            volumeFade.stop();
+            volumeFade = null;
+        }
+        closeOutgoingEngine();
+        PlaybackEngine previous = engine;
+        engine = null;
+        if (previous != null && autoPlay && playing.get()) {
+            outgoingEngine = previous;
+            outgoingEngine.setVolume(volume.get());
+        } else if (previous != null) {
+            previous.close();
+            playing.set(false);
+        }
+        engineReady = false;
+    }
+
+    private void closeOutgoingEngine() {
+        if (outgoingEngine != null) {
+            outgoingEngine.close();
+            outgoingEngine = null;
+        }
     }
 
     private void disposeEngine() {
         stopLoadingTimeout();
+        pausePending = false;
         if (volumeFade != null) {
             volumeFade.stop();
             volumeFade = null;
@@ -456,6 +596,7 @@ public final class MusicService {
             engine.close();
             engine = null;
         }
+        closeOutgoingEngine();
         playing.set(false);
         engineReady = false;
     }

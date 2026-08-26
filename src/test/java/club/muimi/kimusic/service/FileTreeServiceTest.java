@@ -39,4 +39,13 @@ class FileTreeServiceTest {
 
         assertEquals(3, service.scanAudioFiles().size());
     }
+
+    @Test
+    void rejectsUnsupportedIndividualFiles() throws Exception {
+        Path textFile = Files.writeString(temporaryDirectory.resolve("notes.txt"), "not audio");
+        FileTreeService service = FileTreeService.init();
+
+        assertFalse(service.addRootFile(textFile.toFile()));
+        assertTrue(service.getRootFiles().isEmpty());
+    }
 }
