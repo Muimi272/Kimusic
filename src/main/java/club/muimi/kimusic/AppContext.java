@@ -8,6 +8,7 @@ import club.muimi.kimusic.service.NoticeService;
 import club.muimi.kimusic.service.PlaylistService;
 import club.muimi.kimusic.util.DataSerializer;
 import club.muimi.kimusic.status.VisualizationMode;
+import club.muimi.kimusic.status.Language;
 
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -23,6 +24,10 @@ public final class AppContext {
     private final DataSerializer serializer = DataSerializer.init(notices);
     private boolean darkTheme;
     private VisualizationMode visualizationMode;
+    private Language language;
+    private String lyricHighlightColor;
+    private boolean autoDecodeNcm;
+    private int lyricsFontSize;
     private final Path startupTrack;
 
     public AppContext() {
@@ -45,6 +50,12 @@ public final class AppContext {
         music.volumeProperty().set(state.getVolume());
         darkTheme = state.isDarkTheme();
         visualizationMode = state.getVisualizationMode();
+        language = state.getLanguage();
+        lyricHighlightColor = state.getLyricHighlightColor();
+        autoDecodeNcm = state.isAutoDecodeNcm();
+        lyricsFontSize = state.getLyricsFontSize();
+        music.setLanguage(language);
+        music.setAutoDecodeNcm(autoDecodeNcm);
     }
 
     public void save() {
@@ -52,7 +63,8 @@ public final class AppContext {
         Path current = music.currentTrackProperty().get();
         serializer.save(new AppState(library.snapshot(), playlists.snapshot(), queue,
                 darkTheme, music.volumeProperty().get(), visualizationMode,
-                current == null ? null : current.toString()));
+                current == null ? null : current.toString(), language,
+                lyricHighlightColor, autoDecodeNcm, lyricsFontSize));
     }
 
     public void close() {
@@ -99,5 +111,42 @@ public final class AppContext {
     public void setVisualizationMode(VisualizationMode visualizationMode) {
         this.visualizationMode = visualizationMode == null
                 ? VisualizationMode.WAVEFORM : visualizationMode;
+    }
+
+    public Language getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(Language language) {
+        this.language = language == null ? Language.CHINESE : language;
+        music.setLanguage(this.language);
+    }
+
+    public String getLyricHighlightColor() {
+        return lyricHighlightColor;
+    }
+
+    public void setLyricHighlightColor(String lyricHighlightColor) {
+        if (lyricHighlightColor != null
+                && lyricHighlightColor.matches("#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?")) {
+            this.lyricHighlightColor = lyricHighlightColor.toUpperCase();
+        }
+    }
+
+    public boolean isAutoDecodeNcm() {
+        return autoDecodeNcm;
+    }
+
+    public void setAutoDecodeNcm(boolean autoDecodeNcm) {
+        this.autoDecodeNcm = autoDecodeNcm;
+        music.setAutoDecodeNcm(autoDecodeNcm);
+    }
+
+    public int getLyricsFontSize() {
+        return lyricsFontSize;
+    }
+
+    public void setLyricsFontSize(int lyricsFontSize) {
+        this.lyricsFontSize = Math.max(11, Math.min(24, lyricsFontSize));
     }
 }

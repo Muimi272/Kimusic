@@ -3,6 +3,7 @@ package club.muimi.kimusic.util;
 import club.muimi.kimusic.model.AppState;
 import club.muimi.kimusic.service.NoticeService;
 import club.muimi.kimusic.status.VisualizationMode;
+import club.muimi.kimusic.status.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,7 +24,8 @@ class DataSerializerTest {
                 temporaryDirectory.resolve("state.bin"));
         AppState expected = new AppState(List.of("C:/Music"),
                 Map.of("Focus", List.of("C:/Music/a.mp3")),
-                List.of("C:/Music/a.mp3"), true, 0.42, VisualizationMode.SPECTRUM);
+                List.of("C:/Music/a.mp3"), true, 0.42, VisualizationMode.SPECTRUM,
+                "C:/Music/a.mp3", Language.ENGLISH, "#E5484D", false, 19);
 
         assertTrue(serializer.save(expected));
         AppState actual = serializer.load();
@@ -34,5 +36,9 @@ class DataSerializerTest {
         assertTrue(actual.isDarkTheme());
         assertEquals(0.42, actual.getVolume());
         assertEquals(VisualizationMode.SPECTRUM, actual.getVisualizationMode());
+        assertEquals(Language.ENGLISH, actual.getLanguage());
+        assertEquals("#E5484D", actual.getLyricHighlightColor());
+        assertEquals(false, actual.isAutoDecodeNcm());
+        assertEquals(19, actual.getLyricsFontSize());
     }
 }

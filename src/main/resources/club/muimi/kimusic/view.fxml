@@ -24,7 +24,7 @@
             xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="club.muimi.kimusic.view.MainController">
     <top>
-        <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="top-bar">
+        <HBox fx:id="topBar" alignment="CENTER_LEFT" spacing="10.0" styleClass="top-bar">
             <Button fx:id="menuButton" accessibleText="折叠菜单" mnemonicParsing="false" onAction="#toggleMenu" styleClass="icon-action">
                 <graphic><SvgIcon resource="/club/muimi/kimusic/icons/menu.svg" size="19.0" /></graphic>
             </Button>
@@ -47,7 +47,6 @@
             <HBox alignment="CENTER_LEFT" spacing="8.0">
                 <VBox spacing="1.0">
                     <Label styleClass="section-title" text="本地音乐" />
-                    <Label styleClass="eyebrow" text="LIBRARY" />
                 </VBox>
                 <Region HBox.hgrow="ALWAYS" />
                 <Button fx:id="importButton" accessibleText="导入音乐" mnemonicParsing="false" onAction="#showImportMenu" styleClass="small-icon-action">
@@ -74,7 +73,7 @@
     <center>
         <StackPane fx:id="workspaceStack">
             <SplitPane fx:id="workspaceSplit" dividerPositions="0.60" orientation="HORIZONTAL" styleClass="workspace-split">
-                <VBox minWidth="420.0" prefWidth="680.0" spacing="14.0" styleClass="track-pane" HBox.hgrow="ALWAYS">
+                <VBox fx:id="trackPane" minWidth="420.0" prefWidth="680.0" spacing="14.0" styleClass="track-pane" HBox.hgrow="ALWAYS">
                     <HBox alignment="CENTER_LEFT" spacing="12.0">
                         <VBox spacing="2.0">
                             <Label fx:id="viewTitleLabel" styleClass="view-title" text="音乐资料库" />
@@ -99,18 +98,19 @@
                             <graphic><SvgIcon resource="/club/muimi/kimusic/icons/lyrics.svg" size="16.0" /></graphic>
                         </Button>
                     </HBox>
-                    <StackPane fx:id="visualStack" minHeight="320.0" VBox.vgrow="ALWAYS">
-                        <StackPane fx:id="coverPane" maxHeight="440.0" maxWidth="440.0" minHeight="280.0" minWidth="280.0" styleClass="cover-shell">
-                            <ImageView fx:id="coverImage" preserveRatio="false" smooth="true" visible="false" />
+                    <StackPane fx:id="visualStack" minHeight="120.0" VBox.vgrow="ALWAYS">
+                        <StackPane fx:id="coverPane" maxHeight="440.0" maxWidth="440.0" minHeight="120.0" minWidth="120.0" styleClass="cover-shell">
+                            <ImageView fx:id="previousCoverImage" mouseTransparent="true" preserveRatio="true"
+                                       smooth="true" visible="false" />
+                            <ImageView fx:id="coverImage" preserveRatio="true" smooth="true" visible="false" />
                             <VBox fx:id="coverPlaceholder" alignment="CENTER" spacing="18.0" styleClass="cover-placeholder">
                                 <ImageView fitHeight="94.0" fitWidth="94.0" preserveRatio="true" smooth="true" styleClass="cover-logo">
                                     <image><Image url="@logo.png" /></image>
                                 </ImageView>
                                 <Label styleClass="cover-placeholder-title" text="KIMUSIC" />
-                                <Label styleClass="eyebrow" text="LOCAL SOUND" />
                             </VBox>
                         </StackPane>
-                        <VBox fx:id="lyricsPane" alignment="CENTER" managed="false" opacity="0.0" visible="false">
+                        <VBox fx:id="lyricsPane" alignment="CENTER" fillWidth="true" managed="false" opacity="0.0" visible="false">
                             <ListView fx:id="lyricsList" focusTraversable="false" VBox.vgrow="ALWAYS">
                                 <placeholder><Label styleClass="empty-label" text="当前曲目没有歌词" /></placeholder>
                             </ListView>
@@ -142,7 +142,7 @@
         </StackPane>
     </center>
     <bottom>
-        <VBox spacing="8.0" styleClass="player-bar">
+        <VBox fx:id="playerBar" spacing="8.0" styleClass="player-bar">
             <HBox alignment="CENTER" spacing="10.0">
                 <Label fx:id="currentTimeLabel" minWidth="42.0" styleClass="time-label" text="0:00" />
                 <Slider fx:id="progressSlider" blockIncrement="0.01" max="1.0" HBox.hgrow="ALWAYS" />

@@ -41,9 +41,9 @@ public final class DataSerializer {
             if (value instanceof AppState state && state.getVersion() == 1) {
                 return state;
             }
-            noticeService.addNotice("The saved library uses an unsupported format.");
+            noticeService.addError("保存的音乐资料库格式不受支持。");
         } catch (IOException | ClassNotFoundException | RuntimeException exception) {
-            noticeService.addNotice("The saved library could not be restored.");
+            noticeService.addError("无法恢复保存的音乐资料库。");
         }
         return AppState.empty();
     }
@@ -62,7 +62,7 @@ public final class DataSerializer {
             moveIntoPlace(temporary);
             return true;
         } catch (IOException exception) {
-            noticeService.addNotice("The library state could not be saved.");
+            noticeService.addError("无法保存音乐资料库状态。");
             return false;
         }
     }

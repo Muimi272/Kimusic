@@ -30,6 +30,9 @@ public final class FileTreeService {
         if (file == null || !file.exists()) {
             return false;
         }
+        if (file.isFile() && !isAudioFile(file.toPath())) {
+            return false;
+        }
         Path candidate = normalize(file.toPath());
         if (roots.stream().anyMatch(root -> candidate.startsWith(root))) {
             return false;
