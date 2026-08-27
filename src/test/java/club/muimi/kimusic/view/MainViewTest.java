@@ -3,8 +3,10 @@ package club.muimi.kimusic.view;
 import club.muimi.kimusic.KimusicApplication;
 import club.muimi.kimusic.status.Language;
 import club.muimi.kimusic.service.LyricsService.LyricLine;
+import club.muimi.kimusic.service.playback.VisualizationFrame;
 import club.muimi.kimusic.view.component.WaveformView;
 import javafx.application.Platform;
+import javafx.animation.PauseTransition;
 import javafx.animation.SequentialTransition;
 import javafx.animation.Timeline;
 import javafx.fxml.FXMLLoader;
@@ -15,12 +17,14 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.IndexedCell;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.control.skin.VirtualFlow;
 import javafx.geometry.Pos;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
@@ -41,6 +45,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -150,6 +155,19 @@ class MainViewTest {
                 assertTrue(!split.getStyleClass().contains("song-view-expanded"));
 
                 WaveformView waveform = (WaveformView) root.lookup("#waveformView");
+                Field observedMinimum = WaveformView.class.getDeclaredField("observedMinFrequencyHz");
+                observedMinimum.setAccessible(true);
+                waveform.push(new VisualizationFrame(new float[0], new float[64],
+                        Double.NaN, 22_050.0, false));
+                assertTrue(Double.isNaN(observedMinimum.getDouble(waveform)),
+                        "a silent opening frame must not initialize the track minimum");
+                float[] activeSpectrum = new float[2_048];
+                activeSpectrum[41] = 1;
+                waveform.push(new VisualizationFrame(new float[0], activeSpectrum,
+                        440.0, 22_050.0, false));
+                assertEquals(440.0, observedMinimum.getDouble(waveform), 0.01,
+                        "the first active frame must initialize the track minimum");
+                waveform.clear();
                 double coverModeWaveformHeight = waveform.getHeight();
                 Method toggleLyrics = MainController.class.getDeclaredMethod("toggleLyrics");
                 toggleLyrics.setAccessible(true);
@@ -163,19 +181,46 @@ class MainViewTest {
 
                 @SuppressWarnings("unchecked")
                 ListView<LyricLine> lyrics = (ListView<LyricLine>) root.lookup("#lyricsList");
-                lyrics.getItems().setAll(new LyricLine(1,
-                        "这是一行用于验证歌词自动换行能力的超长歌词文本，它应当始终限制在歌词组件的可用宽度以内并自然显示为多行内容。".repeat(3)));
+                Method setLyrics = MainController.class.getDeclaredMethod("setLyrics", List.class);
+                setLyrics.setAccessible(true);
+                setLyrics.invoke(controller, List.of(new LyricLine(1,
+                        "这是一行用于验证歌词自动换行能力的超长歌词文本，它应当始终限制在歌词组件的可用宽度以内并自然显示为多行内容。".repeat(3))));
                 root.applyCss();
                 root.layout();
                 ListCell<?> lyricCell = lyrics.lookupAll(".list-cell").stream()
                         .filter(ListCell.class::isInstance)
                         .map(ListCell.class::cast)
-                        .filter(cell -> cell.getItem() != null)
+                        .filter(cell -> cell.getText() != null && !cell.getText().isBlank())
                         .findFirst().orElseThrow();
                 assertTrue(lyricCell.getWidth() <= lyrics.getWidth(),
                         "a lyric cell must remain within the list viewport");
                 assertTrue(lyricCell.getHeight() > lyricCell.getFont().getSize() * 2,
                         "long lyrics should grow vertically and wrap to multiple lines");
+
+                setLyrics.invoke(controller, IntStream.range(0, 24)
+                        .mapToObj(index -> new LyricLine(index, "Lyric " + index))
+                        .toList());
+                lyrics.getSelectionModel().select(13);
+                Method suspendLyricAutoFollow = MainController.class.getDeclaredMethod(
+                        "suspendLyricAutoFollow");
+                suspendLyricAutoFollow.setAccessible(true);
+                suspendLyricAutoFollow.invoke(controller);
+                Field autoFollowSuspended = MainController.class.getDeclaredField(
+                        "lyricAutoFollowSuspended");
+                autoFollowSuspended.setAccessible(true);
+                assertTrue(autoFollowSuspended.getBoolean(controller),
+                        "manual lyric scrolling must temporarily suspend automatic centering");
+                Field resumeDelayField = MainController.class.getDeclaredField(
+                        "lyricFollowResumeDelay");
+                resumeDelayField.setAccessible(true);
+                PauseTransition resumeDelay = (PauseTransition) resumeDelayField.get(controller);
+                assertEquals(3_000, resumeDelay.getDuration().toMillis(), 0.01);
+                resumeDelay.stop();
+                resumeDelay.getOnFinished().handle(null);
+                assertTrue(!autoFollowSuspended.getBoolean(controller),
+                        "the current lyric must resume following after the delay");
+                assertEquals(35, MainController.lyricCenterOffset(120, 155), 0.01,
+                        "centering must use the actual pixel distance between lyric and viewport");
 
                 WritableImage redArtwork = solidImage(Color.CRIMSON);
                 WritableImage blueArtwork = solidImage(Color.DODGERBLUE);
@@ -300,6 +345,91 @@ class MainViewTest {
         assertTrue(completed.await(10, TimeUnit.SECONDS), "FXML loading timed out");
         if (failure.get() != null) {
             throw new AssertionError("FXML loading failed", failure.get());
+        }
+    }
+
+    @Test
+    void lyricFollowCentersMiddleAndEdgeLines() throws Exception {
+        CountDownLatch completed = new CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+
+        Runnable setup = () -> {
+            try {
+                FXMLLoader loader = new FXMLLoader(KimusicApplication.class.getResource("view.fxml"));
+                Parent root = loader.load();
+                Scene scene = new Scene(root, 1_200, 700);
+                scene.getStylesheets().add(
+                        KimusicApplication.class.getResource("kimusic.css").toExternalForm());
+                MainController controller = loader.getController();
+                Method toggleLyrics = MainController.class.getDeclaredMethod("toggleLyrics");
+                toggleLyrics.setAccessible(true);
+                toggleLyrics.invoke(controller);
+                root.applyCss();
+                root.layout();
+
+                @SuppressWarnings("unchecked")
+                ListView<LyricLine> lyrics = (ListView<LyricLine>) root.lookup("#lyricsList");
+                Method setLyrics = MainController.class.getDeclaredMethod("setLyrics", List.class);
+                setLyrics.setAccessible(true);
+                setLyrics.invoke(controller, IntStream.range(0, 31)
+                        .mapToObj(index -> new LyricLine(index, "Lyric line " + index))
+                        .toList());
+                root.applyCss();
+                root.layout();
+                verifyCenteredLyric(controller, root, lyrics, 15, () ->
+                        verifyCenteredLyric(controller, root, lyrics, 0, () ->
+                                verifyCenteredLyric(controller, root, lyrics, 30, completed::countDown,
+                                        failure), failure), failure);
+            } catch (Throwable throwable) {
+                failure.set(throwable);
+                completed.countDown();
+            }
+        };
+        try {
+            Platform.startup(setup);
+        } catch (IllegalStateException alreadyStarted) {
+            Platform.runLater(setup);
+        }
+
+        assertTrue(completed.await(5, TimeUnit.SECONDS), "lyric centering timed out");
+        if (failure.get() != null) {
+            throw new AssertionError("lyric centering failed", failure.get());
+        }
+    }
+
+    private static void verifyCenteredLyric(MainController controller, Parent root,
+                                            ListView<LyricLine> lyrics, int index,
+                                            Runnable next, AtomicReference<Throwable> failure) {
+        try {
+            int displayIndex = index + 1;
+            lyrics.getSelectionModel().select(displayIndex);
+            Method smoothScroll = MainController.class.getDeclaredMethod("smoothScrollLyrics", int.class);
+            smoothScroll.setAccessible(true);
+            smoothScroll.invoke(controller, displayIndex);
+            PauseTransition waitForAnimation = new PauseTransition(javafx.util.Duration.millis(620));
+            waitForAnimation.setOnFinished(event -> {
+                try {
+                    root.layout();
+                    VirtualFlow<?> flow = (VirtualFlow<?>) lyrics.lookup(".virtual-flow");
+                    IndexedCell<?> cell = flow.getVisibleCell(displayIndex);
+                    assertNotNull(cell, "the active lyric must be visible");
+                    double contentHeight = cell.getHeight()
+                            - cell.getPadding().getTop() - cell.getPadding().getBottom();
+                    double contentCenter = cell.getPadding().getTop() + contentHeight / 2;
+                    double lyricCenterY = cell.localToScene(0, contentCenter).getY();
+                    double viewportCenterY = flow.localToScene(0, flow.getHeight() / 2).getY();
+                    assertEquals(viewportCenterY, lyricCenterY, 1.5,
+                            "active lyric " + index + " must be vertically centered");
+                    next.run();
+                } catch (Throwable throwable) {
+                    failure.compareAndSet(null, throwable);
+                    next.run();
+                }
+            });
+            waitForAnimation.play();
+        } catch (Throwable throwable) {
+            failure.compareAndSet(null, throwable);
+            next.run();
         }
     }
 

@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 
 final class JavaSoundPlaybackEngine implements PlaybackEngine {
+    private static final double ACTIVE_SPECTRUM_RELATIVE_FLOOR = 0.003;
     private final Object pauseLock = new Object();
     private volatile boolean closed;
     private volatile boolean paused;
@@ -491,7 +492,10 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
             int band = Math.min(waveform.length - 1, sample / samplesPerBand);
             waveform[band] = Math.max(waveform[band], Math.abs(scaled) / 32768f);
         }
-        return new VisualizationFrame(waveform, spectrumOf(buffer, length, channels), maxFrequencyHz);
+        float[] spectrum = spectrumOf(buffer, length, channels);
+        double minFrequencyHz = lowestActiveFrequency(spectrum, maxFrequencyHz, false);
+        return new VisualizationFrame(waveform, spectrum,
+                minFrequencyHz, maxFrequencyHz, false);
     }
 
     private float[] spectrumOf(byte[] buffer, int length, int channels) {
@@ -530,6 +534,31 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
             spectrum[bin] = (float) Math.max(0, Math.min(20, amplitude));
         }
         return spectrum;
+    }
+
+    static double lowestActiveFrequency(float[] spectrum, double maxFrequencyHz,
+                                        boolean bandAggregated) {
+        if (spectrum == null || spectrum.length == 0
+                || !Double.isFinite(maxFrequencyHz) || maxFrequencyHz <= 0) {
+            return Double.NaN;
+        }
+        float peak = 0;
+        for (float value : spectrum) {
+            if (Float.isFinite(value)) {
+                peak = Math.max(peak, Math.max(0, value));
+            }
+        }
+        double binWidthHz = maxFrequencyHz / spectrum.length;
+        int firstBin = bandAggregated ? 0 : Math.min(1, spectrum.length - 1);
+        double floor = bandAggregated ? Math.pow(10.0, -59.0 / 20.0) : 1e-5;
+        double threshold = Math.max(floor, peak * ACTIVE_SPECTRUM_RELATIVE_FLOOR);
+        for (int bin = firstBin; bin < spectrum.length; bin++) {
+            if (Float.isFinite(spectrum[bin]) && spectrum[bin] > threshold) {
+                return bandAggregated && bin == 0
+                        ? Math.min(20.0, binWidthHz) : Math.max(binWidthHz, bin * binWidthHz);
+            }
+        }
+        return Double.NaN;
     }
 
     private void fft(double[] real, double[] imaginary) {

@@ -1,55 +1,131 @@
-# Kimusic
+<p align="center">
+  <img src="src/main/resources/club/muimi/kimusic/logo.png" width="128" height="128" alt="Kimusic logo">
+</p>
 
-Kimusic 是一个基于 JavaFX 的本地音乐播放器，面向希望管理本地音乐、歌单和歌词的桌面用户。应用采用简洁的双栏布局，支持浅色和深色主题，并提供可调整的音乐库与播放视图。
+<h1 align="center">Kimusic</h1>
 
-## 功能
+<p align="center">A local-first desktop music player built with JavaFX.</p>
 
-- 导入音频文件或文件夹，使用文件树管理本地音乐库
-- 支持 MP3、FLAC、WAV、AAC、AIFF、M4A、OGG 和 NCM 文件
-- NCM 文件通过 ncmdump 解码后播放
-- 自定义歌单、当前播放列表和四种播放模式：顺序、列表循环、单曲循环、随机
-- 自动读取音频内嵌封面或同目录封面图片
-- 自动查找同目录歌词文件并滚动显示
-- 波形图和频谱可视化，可在设置中切换
-- 可拖动的音乐库/播放视图分隔栏
-- 浅色/深色主题、平滑歌词滚动、播放淡入淡出和封面色彩背景
-- 音乐库目录自动扫描新增音频文件
-- 库、歌单、播放队列、主题和上次播放歌曲状态持久化保存
+<p align="center"><strong>English</strong> | <a href="README%20-%20ZH.md">简体中文</a></p>
 
-## 环境要求
+## Introduction
 
-- JDK 21 或更高版本
-- Maven 3.9 或使用仓库中的 Maven Wrapper
-- Windows 下播放 NCM 文件需要随应用提供的 `ncmdump.exe`
+Kimusic is a cross-platform desktop player for organizing and playing a personal local music library. It combines a compact two-pane library and playback layout with playlists, synchronized lyrics, artwork, waveform and spectrum visualizations, and light and dark themes.
 
-## 本地开发
+Kimusic works with local files and does not require an account or cloud service. NCM containers are handled by a built-in pure Java decoder, so NCM playback does not depend on a separately installed platform executable.
 
-```bash
-mvn test
-mvn javafx:run
-```
+## Core Highlights
 
-Windows PowerShell：
+- **Local-first:** music, lyrics, playlists, settings, and decoded files stay on the local computer.
+- **Cross-platform:** release packages are built for 64-bit Windows and x86-64 Linux.
+- **Broad format support:** MP3, FLAC, WAV, AAC, AIFF, M4A, OGG, and NCM.
+- **Built-in NCM support:** the same pure Java decoder is used on Windows and Linux; an external decoder is only an optional fallback.
+- **Playback-focused interface:** library management, queue controls, lyrics, artwork, and visualization remain available without leaving the main window.
 
-```powershell
-.\mvnw.cmd test
-.\mvnw.cmd javafx:run
-```
+## Features
 
-## 构建
+- Import individual audio files or folders and browse them in a file tree.
+- Automatically discover new supported files under imported library folders.
+- Create playlists, add or remove tracks, and restore them between sessions.
+- Manage the queue with sequential, repeat-all, repeat-one, and shuffle modes.
+- Read embedded metadata and artwork, with support for companion cover images.
+- Find companion lyric files, highlight and center the current line, and temporarily pause following during manual scrolling.
+- Switch between waveform and frequency-spectrum visualizations.
+- Use light and dark themes, configurable lyric styling, smooth scrolling, playback fades, and artwork-derived backgrounds.
+- Switch the interface between English and Simplified Chinese.
+- Decode NCM files into a private local cache before playback.
 
-构建普通 JAR：
+## Installation (Releases)
 
-```bash
-mvn package
-```
+Download a package from the [GitHub Releases page](https://github.com/Muimi272/Kimusic/releases). Review the release notes before installing because early releases may be marked as pre-release builds.
 
-Windows 安装包使用 JDK 自带的 `jpackage`。完整发行包和校验文件会发布在 GitHub Releases 中。
+### Windows
 
-## 数据和隐私
+Download either the <code>.exe</code> installer or the <code>.msi</code> package, then run it normally. The EXE installer can create Start Menu and desktop shortcuts.
 
-Kimusic 只读取用户主动导入的本地音乐目录。应用状态默认保存在用户目录下的 `.kimusic/state.bin`，不上传音乐文件、歌词或播放记录。
+### Linux
 
-## 许可证
+Use the Debian package on Debian, Ubuntu, or compatible distributions:
 
-本项目使用 MIT 许可证，详见 [LICENSE](LICENSE)。
+~~~bash
+sudo apt install ./kimusic_*.deb
+~~~
+
+Alternatively, download the x86-64 AppImage:
+
+~~~bash
+chmod +x Kimusic-x86_64.AppImage
+./Kimusic-x86_64.AppImage
+~~~
+
+If the system does not provide FUSE support, run the AppImage with <code>--appimage-extract-and-run</code>.
+
+
+## Development Requirements
+
+- JDK 21 or newer, including <code>jpackage</code> for client packaging.
+- Git.
+- Maven 3.9 or the included Maven Wrapper. The wrapper and dependencies require internet access on their first run.
+- A 64-bit Windows or x86-64 Linux environment for reproducing the official release packages.
+- WiX Toolset 3.x for Windows EXE/MSI packaging.
+- <code>fakeroot</code> and Debian packaging tools for Linux DEB packaging.
+
+Run the test suite and start the application from source with:
+
+~~~bash
+./mvnw test
+./mvnw javafx:run
+~~~
+
+On Windows PowerShell, use <code>.\mvnw.cmd</code> instead of <code>./mvnw</code>.
+
+NCM decoding works without external software. To provide an optional fallback for files rejected by the built-in implementation, set <code>KIMUSIC_NCMDUMP</code> to the absolute path of an executable compatible with the ncmdump command-line interface.
+
+## Data and Privacy
+
+Kimusic has no account system, analytics, telemetry, cloud synchronization, or runtime upload feature. It reads the folders and files selected by the user, plus matching local lyric and artwork files.
+
+Application data is stored under <code>.kimusic</code> in the current user's home directory:
+
+- <code>~/.kimusic/state.bin</code> stores imported library folder paths, playlists and their track paths, the playback queue, the last selected track, volume, theme, language, visualization mode, lyric styling, and the automatic NCM decoding preference.
+- <code>~/.kimusic/cache/ncm/</code> stores decoded audio produced from NCM files, including metadata and embedded artwork where available. These files remain until the cache is deleted manually.
+
+On Windows, <code>~</code> normally resolves to <code>%USERPROFILE%</code>. On Linux, it normally resolves to <code>$HOME</code>. Deleting the <code>.kimusic</code> directory resets saved state and removes the decoded NCM cache; original music, lyric, and artwork files are not modified or deleted.
+
+## Contributing
+
+Issues and pull requests are welcome:
+
+1. Search existing issues before opening a new one.
+2. Fork the repository and create a focused branch.
+3. Keep changes scoped and add or update tests for behavior changes.
+4. Run <code>./mvnw clean test</code> before submitting a pull request.
+5. Describe the motivation, user-visible behavior, and platforms tested.
+
+Do not commit copyrighted music, decrypted audio, account data, or other private test material. Use synthetic or freely redistributable fixtures.
+
+## Open Source License
+
+Kimusic is distributed under the [MIT License](LICENSE), copyright 2026 Muimi272.
+
+Third-party libraries, fonts, and adapted source remain subject to their own licenses. The built-in NCM decoder is adapted from the MIT-licensed [qaralotte/ncmdump](https://github.com/qaralotte/ncmdump); its license text is included in the application resources.
+
+## Disclaimer
+
+Kimusic does not provide, host, sell, or distribute music. Copyright in music, sound recordings, lyrics, album artwork, and related material belongs to the respective record companies, creators, performers, publishers, and other rights holders.
+
+The NCM parsing and decoding feature is intended solely for personal format conversion and playback of music that the user has lawfully purchased or is otherwise authorized to access. It must not be used to infringe copyright, circumvent access restrictions without authorization, redistribute decoded files, or violate applicable law or service agreements. Users are responsible for ensuring that their use is lawful.
+
+Kimusic is an independent open-source project and is not affiliated with, endorsed by, or sponsored by NetEase Cloud Music or any record company.
+
+## Acknowledgements
+
+Kimusic is built with or informed by the following open-source projects:
+
+- [OpenJFX](https://openjfx.io/) - desktop UI and media support.
+- [AtlantaFX](https://github.com/mkpaz/atlantafx) - JavaFX design system.
+- [qaralotte/ncmdump](https://github.com/qaralotte/ncmdump) - reference for NCM container parsing and decryption.
+- [jaudiotagger](https://www.jthink.net/jaudiotagger/) - audio metadata and artwork handling.
+- [MP3SPI](https://github.com/umjammer/mp3spi), [VorbisSPI](https://github.com/umjammer/vorbisspi), and [jFLAC](https://github.com/jflac/jflac-codec) - Java audio format support.
+- [Gson](https://github.com/google/gson) - metadata JSON parsing.
+- [Source Han Sans](https://github.com/adobe-fonts/source-han-sans), [Noto CJK](https://github.com/notofonts/noto-cjk), and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) - bundled typefaces.

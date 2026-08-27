@@ -14,6 +14,7 @@ final class JavaFxPlaybackEngine implements PlaybackEngine {
 
     @Override
     public void open(Path track, PlaybackListener listener, double volume, boolean autoPlay) {
+        double maxFrequencyHz = AudioSampleRateProbe.nyquistHz(track);
         Media media = new Media(track.toUri().toString());
         media.getMetadata().addListener((MapChangeListener<String, Object>) change -> {
             if (!closed && "image".equals(change.getKey()) && change.getValueAdded() instanceof Image image) {
@@ -35,8 +36,11 @@ final class JavaFxPlaybackEngine implements PlaybackEngine {
                     spectrum[index] = (float) Math.pow(10, db / 20.0);
                     waveform[index] = (float) ((db + 60) / 60.0);
                 }
+                double minFrequencyHz = JavaSoundPlaybackEngine.lowestActiveFrequency(
+                        spectrum, maxFrequencyHz, true);
                 listener.onProgress(created.getCurrentTime().toSeconds(),
-                        new VisualizationFrame(waveform, spectrum, 20_000.0, true));
+                        new VisualizationFrame(waveform, spectrum,
+                                minFrequencyHz, maxFrequencyHz, true));
             }
         });
         created.setOnReady(() -> {

@@ -27,6 +27,7 @@ import javafx.animation.Timeline;
 import javafx.animation.TranslateTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
@@ -66,9 +67,12 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.PixelReader;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
@@ -100,6 +104,11 @@ public final class MainController {
     private static final double DEFAULT_WORKSPACE_DIVIDER_POSITION = 0.60;
     private static final Color DEFAULT_SONG_BACKGROUND = Color.web("#EEF2F0");
     private static final PseudoClass PLAYING = PseudoClass.getPseudoClass("playing");
+    private static final Duration LYRIC_FOLLOW_RESUME_DELAY = Duration.seconds(3);
+    private static final String LYRIC_SCROLL_TRACKING_KEY =
+            MainController.class.getName() + ".lyricScrollTracking";
+    private static final LyricLine LYRIC_TOP_SPACER = new LyricLine(Double.NaN, "");
+    private static final LyricLine LYRIC_BOTTOM_SPACER = new LyricLine(Double.NaN, "");
 
     @FXML
     private BorderPane root;
@@ -192,6 +201,7 @@ public final class MainController {
 
     private final ObservableList<Path> libraryTracks = FXCollections.observableArrayList();
     private final ObservableList<Path> displayedTracks = FXCollections.observableArrayList();
+    private final ObservableList<LyricLine> lyricLines = FXCollections.observableArrayList();
     private final ObservableList<LyricLine> displayedLyrics = FXCollections.observableArrayList();
     private AppContext context;
     private boolean sidebarExpanded = true;
@@ -210,6 +220,7 @@ public final class MainController {
     private Language language = Language.CHINESE;
     private Timeline libraryWatch;
     private Timeline lyricScrollAnimation;
+    private PauseTransition lyricFollowResumeDelay;
     private SequentialTransition lyricStyleAnimation;
     private Timeline songViewAnimation;
     private int lyricsFontSize = 14;
@@ -218,6 +229,7 @@ public final class MainController {
     private boolean libraryLoaded;
     private boolean libraryScanInFlight;
     private boolean songViewExpanded;
+    private boolean lyricAutoFollowSuspended;
     private double previousWorkspaceDividerPosition = DEFAULT_WORKSPACE_DIVIDER_POSITION;
     private Tooltip coverExpansionTooltip;
 
@@ -475,6 +487,9 @@ public final class MainController {
             lyricsPane.setManaged(showLyrics);
             lyricsPane.setVisible(showLyrics);
             lyricsAnimation = null;
+            if (showLyrics) {
+                recenterActiveLyric();
+            }
         });
         lyricsAnimation.play();
     }
@@ -794,6 +809,7 @@ public final class MainController {
                 prefWidthProperty().bind(javafx.beans.binding.Bindings.max(
                         0, list.widthProperty().subtract(18)));
                 maxWidthProperty().bind(prefWidthProperty());
+                list.heightProperty().addListener(observable -> updateLyricCellStyle());
             }
 
             @Override
@@ -803,9 +819,7 @@ public final class MainController {
                 setWrapText(true);
                 setTextAlignment(TextAlignment.CENTER);
                 setTextOverrun(OverrunStyle.CLIP);
-                setMinHeight(Region.USE_PREF_SIZE);
                 updateLyricCellStyle();
-                setMouseTransparent(false);
             }
 
             @Override
@@ -815,12 +829,39 @@ public final class MainController {
             }
 
             private void updateLyricCellStyle() {
+                LyricLine line = getItem();
+                boolean spacer = line == LYRIC_TOP_SPACER || line == LYRIC_BOTTOM_SPACER;
+                if (spacer) {
+                    double spacerHeight = Math.max(0, list.getHeight() / 2);
+                    setText(null);
+                    setMinHeight(spacerHeight);
+                    setPrefHeight(spacerHeight);
+                    setMaxHeight(spacerHeight);
+                    setPadding(Insets.EMPTY);
+                    setMouseTransparent(true);
+                    setStyle("");
+                    return;
+                }
+                setMinHeight(Region.USE_PREF_SIZE);
+                setPrefHeight(Region.USE_COMPUTED_SIZE);
+                setMaxHeight(Double.MAX_VALUE);
+                setPadding(new Insets(9, 20, 9, 20));
+                setMouseTransparent(false);
                 setStyle("-fx-font-size: " + (isSelected() ? lyricsFontSize + 2 : lyricsFontSize) + "px;");
             }
         });
         lyricsList.setFixedCellSize(-1);
-        lyricsList.skinProperty().addListener((observable, oldSkin, skin) ->
-                Platform.runLater(lyricsList::refresh));
+        lyricsList.skinProperty().addListener((observable, oldSkin, skin) -> Platform.runLater(() -> {
+            lyricsList.refresh();
+            installLyricScrollTracking();
+            recenterActiveLyric();
+        }));
+        lyricsList.addEventFilter(ScrollEvent.SCROLL, event -> suspendLyricAutoFollow());
+        lyricsList.widthProperty().addListener(observable -> recenterActiveLyric());
+        lyricsList.heightProperty().addListener(observable -> {
+            lyricsList.refresh();
+            recenterActiveLyric();
+        });
         lyricsList.setOnMouseClicked(event -> {
             Node target = event.getPickResult().getIntersectedNode();
             while (target != null && !(target instanceof ListCell<?>)) {
@@ -836,9 +877,77 @@ public final class MainController {
         });
     }
 
+    private void installLyricScrollTracking() {
+        ScrollBar vertical = verticalLyricScrollBar();
+        if (vertical == null || vertical.getProperties().putIfAbsent(
+                LYRIC_SCROLL_TRACKING_KEY, Boolean.TRUE) != null) {
+            return;
+        }
+        vertical.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> suspendLyricAutoFollow());
+        vertical.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> suspendLyricAutoFollow());
+    }
+
+    private ScrollBar verticalLyricScrollBar() {
+        return lyricsList.lookupAll(".scroll-bar").stream()
+                .filter(ScrollBar.class::isInstance)
+                .map(ScrollBar.class::cast)
+                .filter(bar -> bar.getOrientation() == javafx.geometry.Orientation.VERTICAL)
+                .findFirst().orElse(null);
+    }
+
+    private void suspendLyricAutoFollow() {
+        if (lyricLines.isEmpty()) {
+            return;
+        }
+        lyricAutoFollowSuspended = true;
+        if (lyricScrollAnimation != null) {
+            lyricScrollAnimation.stop();
+            lyricScrollAnimation = null;
+        }
+        if (lyricFollowResumeDelay == null) {
+            lyricFollowResumeDelay = new PauseTransition(LYRIC_FOLLOW_RESUME_DELAY);
+            lyricFollowResumeDelay.setOnFinished(event -> {
+                lyricAutoFollowSuspended = false;
+                recenterActiveLyric();
+            });
+        }
+        lyricFollowResumeDelay.playFromStart();
+    }
+
+    private void resetLyricAutoFollow() {
+        lyricAutoFollowSuspended = false;
+        if (lyricFollowResumeDelay != null) {
+            lyricFollowResumeDelay.stop();
+        }
+        if (lyricScrollAnimation != null) {
+            lyricScrollAnimation.stop();
+            lyricScrollAnimation = null;
+        }
+    }
+
+    private void recenterActiveLyric() {
+        if (!lyricsVisible || lyricAutoFollowSuspended) {
+            return;
+        }
+        int index = lyricsList.getSelectionModel().getSelectedIndex();
+        if (index >= 0) {
+            smoothScrollLyrics(index);
+        }
+    }
+
     static OptionalDouble lyricSeekTarget(LyricLine line) {
         return line != null && Double.isFinite(line.seconds()) && line.seconds() >= 0
                 ? OptionalDouble.of(line.seconds()) : OptionalDouble.empty();
+    }
+
+    private void setLyrics(List<LyricLine> lines) {
+        lyricLines.setAll(lines == null ? List.of() : lines);
+        displayedLyrics.clear();
+        if (!lyricLines.isEmpty()) {
+            displayedLyrics.add(LYRIC_TOP_SPACER);
+            displayedLyrics.addAll(lyricLines);
+            displayedLyrics.add(LYRIC_BOTTOM_SPACER);
+        }
     }
 
     private void applyLyricsFontSize() {
@@ -1206,18 +1315,19 @@ public final class MainController {
     }
 
     private void updateCurrentTrack(Path track) {
+        resetLyricAutoFollow();
         waveformView.clear();
         if (track == null) {
             nowTitleLabel.setText(t("未在播放"));
             nowPathLabel.setText("");
             visualTitleLabel.setText(t("选择一首音乐"));
             visualPathLabel.setText("");
-            displayedLyrics.clear();
+            setLyrics(List.of());
             updateArtwork(null);
             return;
         }
         writeTrackLabels(track);
-        displayedLyrics.setAll(context.lyrics().load(track));
+        setLyrics(context.lyrics().load(track));
         lyricsList.getSelectionModel().clearSelection();
     }
 
@@ -1406,35 +1516,79 @@ public final class MainController {
     }
 
     private void updateActiveLyric(double seconds) {
-        int index = context.lyrics().activeLineIndex(displayedLyrics, seconds);
-        if (index >= 0 && index != lyricsList.getSelectionModel().getSelectedIndex()) {
-            lyricsList.getSelectionModel().select(index);
-            smoothScrollLyrics(index);
+        int lyricIndex = context.lyrics().activeLineIndex(lyricLines, seconds);
+        int displayIndex = lyricIndex < 0 ? -1 : lyricIndex + 1;
+        if (displayIndex >= 0 && displayIndex != lyricsList.getSelectionModel().getSelectedIndex()) {
+            lyricsList.getSelectionModel().select(displayIndex);
+            if (lyricsVisible && !lyricAutoFollowSuspended) {
+                smoothScrollLyrics(displayIndex);
+            }
         }
     }
 
     private void smoothScrollLyrics(int index) {
         Platform.runLater(() -> {
-            ScrollBar vertical = lyricsList.lookupAll(".scroll-bar").stream()
-                    .filter(ScrollBar.class::isInstance)
-                    .map(ScrollBar.class::cast)
-                    .filter(bar -> bar.getOrientation() == javafx.geometry.Orientation.VERTICAL)
-                    .findFirst().orElse(null);
-            if (vertical == null || vertical.getMax() <= 0) {
-                lyricsList.scrollTo(Math.max(0, index - 3));
+            if (lyricAutoFollowSuspended || index < 0 || index >= displayedLyrics.size()) {
                 return;
             }
-            double target = Math.max(0, Math.min(1,
-                    (index - 2.0) / Math.max(1, displayedLyrics.size() - 1)));
+            Node flowNode = lyricsList.lookup(".virtual-flow");
+            if (!(flowNode instanceof VirtualFlow<?> flow)) {
+                lyricsList.scrollTo(index);
+                return;
+            }
+            flow.scrollTo(index);
+            lyricsList.applyCss();
+            lyricsList.layout();
+            javafx.scene.control.IndexedCell<?> cell = flow.getVisibleCell(index);
+            if (cell == null) {
+                lyricsList.scrollTo(index);
+                return;
+            }
+            double targetPixels = lyricCenterOffset(flow, cell);
+            if (Math.abs(targetPixels) < 0.5) {
+                return;
+            }
             if (lyricScrollAnimation != null) {
                 lyricScrollAnimation.stop();
             }
+            SimpleDoubleProperty animatedPixels = new SimpleDoubleProperty();
+            double[] previousPixels = {0};
+            animatedPixels.addListener((observable, oldValue, newValue) -> {
+                double next = newValue.doubleValue();
+                flow.scrollPixels(next - previousPixels[0]);
+                previousPixels[0] = next;
+            });
             lyricScrollAnimation = new Timeline(
                     new KeyFrame(Duration.millis(260),
-                            new KeyValue(vertical.valueProperty(), target, Interpolator.EASE_BOTH)));
-            lyricScrollAnimation.setOnFinished(event -> lyricScrollAnimation = null);
+                            new KeyValue(animatedPixels, targetPixels, Interpolator.EASE_BOTH)));
+            lyricScrollAnimation.setOnFinished(event -> {
+                lyricScrollAnimation = null;
+                lyricsList.layout();
+                javafx.scene.control.IndexedCell<?> finalCell = flow.getVisibleCell(index);
+                if (finalCell != null) {
+                    flow.scrollPixels(lyricCenterOffset(flow, finalCell));
+                    lyricsList.layout();
+                }
+            });
             lyricScrollAnimation.play();
         });
+    }
+
+    static double lyricCenterOffset(double viewportCenterY, double lyricCenterY) {
+        if (!Double.isFinite(viewportCenterY) || !Double.isFinite(lyricCenterY)) {
+            return 0;
+        }
+        return lyricCenterY - viewportCenterY;
+    }
+
+    private static double lyricCenterOffset(VirtualFlow<?> flow,
+                                            javafx.scene.control.IndexedCell<?> cell) {
+        double contentHeight = Math.max(0,
+                cell.getHeight() - cell.getPadding().getTop() - cell.getPadding().getBottom());
+        double contentCenter = cell.getPadding().getTop() + contentHeight / 2;
+        double lyricCenterY = cell.localToScene(0, contentCenter).getY();
+        double viewportCenterY = flow.localToScene(0, flow.getHeight() / 2).getY();
+        return lyricCenterOffset(viewportCenterY, lyricCenterY);
     }
 
     private void updateProgress(double current, double duration) {
