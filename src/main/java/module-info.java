@@ -4,11 +4,13 @@ module club.muimi.kimusic {
     requires javafx.media;
     requires atlantafx.base;
     requires java.desktop;
+    requires java.logging;
     requires java.xml;
     requires dev.mccue.mp3spi;
     requires dev.mccue.vorbisspi;
     requires jflac.codec;
     requires jaudiotagger;
+    requires com.google.gson;
 
     opens club.muimi.kimusic.view to javafx.fxml;
     exports club.muimi.kimusic;

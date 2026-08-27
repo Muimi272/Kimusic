@@ -25,6 +25,7 @@ public final class WaveformView extends Region {
             new SimpleObjectProperty<>(VisualizationMode.WAVEFORM);
     private int cursor;
     private double displayScale = 1.0;
+    private double observedMinFrequencyHz = Double.NaN;
 
     public WaveformView() {
         getStyleClass().add("waveform-view");
@@ -42,7 +43,7 @@ public final class WaveformView extends Region {
             return;
         }
         pushWaveform(frame.waveform());
-        pushSpectrum(frame.spectrum(), frame.maxFrequencyHz(), frame.spectrumIsBandAggregated());
+        pushSpectrum(frame.spectrum(), frame.minFrequencyHz(), frame.maxFrequencyHz());
         draw();
     }
 
@@ -58,51 +59,72 @@ public final class WaveformView extends Region {
         cursor = (cursor + 1) % history.length;
     }
 
-    private void pushSpectrum(float[] values, double maxFrequencyHz, boolean bandAggregated) {
+    private void pushSpectrum(float[] values, double minFrequencyHz, double maxFrequencyHz) {
         if (values == null || values.length == 0) {
             return;
         }
-        double displayMaxFrequency = Math.max(20.0, Math.min(20_000.0, maxFrequencyHz));
+        double sourceMaxFrequency = Math.max(1.0, maxFrequencyHz);
+        double displayMaxFrequency = Math.min(20_000.0, sourceMaxFrequency);
+        if (Double.isFinite(minFrequencyHz) && minFrequencyHz > 0) {
+            double detectedMinimum = Math.max(1.0,
+                    Math.min(displayMaxFrequency, minFrequencyHz));
+            if (!Double.isFinite(observedMinFrequencyHz)
+                    || detectedMinimum < observedMinFrequencyHz) {
+                if (Double.isFinite(observedMinFrequencyHz)) {
+                    Arrays.fill(spectrum, 0);
+                    Arrays.fill(spectrumPeaks, 0);
+                }
+                observedMinFrequencyHz = detectedMinimum;
+            }
+        }
+        double projectionMinimum = Double.isFinite(observedMinFrequencyHz)
+                ? observedMinFrequencyHz : Math.max(1.0, sourceMaxFrequency / values.length);
+        float[] projected = projectSpectrum(values, projectionMinimum,
+                sourceMaxFrequency, displayMaxFrequency, spectrum.length);
         for (int index = 0; index < spectrum.length; index++) {
-            int from = 0;
-            int to = 0;
-            double energy = 0;
-            double count = 0;
-            if (bandAggregated) {
-                from = Math.min(values.length - 1,
-                        (int) ((long) index * values.length / spectrum.length));
-                to = Math.min(values.length, from + 1);
-            } else {
-                double fromFrequency = 20.0 * Math.pow(displayMaxFrequency / 20.0,
-                        (double) index / spectrum.length);
-                double toFrequency = 20.0 * Math.pow(displayMaxFrequency / 20.0,
-                        (double) (index + 1) / spectrum.length);
-                double fromBin = fromFrequency / maxFrequencyHz * values.length;
-                double toBin = toFrequency / maxFrequencyHz * values.length;
-                int firstBin = Math.max(0, (int) Math.floor(fromBin));
-                int lastBin = Math.min(values.length - 1, (int) Math.ceil(toBin) - 1);
-                for (int source = firstBin; source <= lastBin; source++) {
-                    double weight = Math.min(toBin, source + 1.0) - Math.max(fromBin, source);
-                    if (weight <= 0) {
-                        continue;
-                    }
-                    double value = Math.max(0, Math.min(20, values[source]));
-                    energy += value * value * weight;
-                    count += weight;
-                }
-            }
-            if (bandAggregated) {
-                for (int source = from; source < to; source++) {
-                    double bandValue = Math.max(0, Math.min(20, values[source]));
-                    energy += bandValue * bandValue;
-                    count++;
-                }
-            }
-            float value = count == 0 ? 0 : (float) Math.sqrt(energy / count);
+            float value = projected[index];
             // Preserve headroom so dense peaks can be normalized during drawing.
             spectrum[index] += (value - spectrum[index]) * (value > spectrum[index] ? 0.62f : 0.2f);
             spectrumPeaks[index] = Math.max(spectrum[index], spectrumPeaks[index] - 0.018f);
         }
+    }
+
+    static float[] projectSpectrum(float[] values, double minFrequencyHz,
+                                   double sourceMaxFrequencyHz,
+                                   double displayMaxFrequencyHz, int bandCount) {
+        if (values == null || values.length == 0 || bandCount <= 0) {
+            return new float[0];
+        }
+        double sourceMaximum = Double.isFinite(sourceMaxFrequencyHz) && sourceMaxFrequencyHz > 0
+                ? sourceMaxFrequencyHz : 20_000.0;
+        double maximum = Double.isFinite(displayMaxFrequencyHz) && displayMaxFrequencyHz > 0
+                ? Math.min(displayMaxFrequencyHz, sourceMaximum) : Math.min(20_000.0, sourceMaximum);
+        double minimum = Double.isFinite(minFrequencyHz) && minFrequencyHz > 0
+                ? Math.min(minFrequencyHz, maximum) : Math.min(20.0, maximum);
+        double ratio = maximum / minimum;
+        float[] projected = new float[bandCount];
+        for (int index = 0; index < bandCount; index++) {
+            double lowExponent = (double) (bandCount - index - 1) / bandCount;
+            double highExponent = (double) (bandCount - index) / bandCount;
+            double fromBin = minimum * Math.pow(ratio, lowExponent) / sourceMaximum * values.length;
+            double toBin = minimum * Math.pow(ratio, highExponent) / sourceMaximum * values.length;
+            int firstBin = Math.max(0, (int) Math.floor(fromBin));
+            int lastBin = Math.min(values.length - 1, (int) Math.ceil(toBin) - 1);
+            double energy = 0;
+            double count = 0;
+            for (int source = firstBin; source <= lastBin; source++) {
+                double weight = Math.min(toBin, source + 1.0) - Math.max(fromBin, source);
+                if (weight <= 0) {
+                    continue;
+                }
+                double value = Float.isFinite(values[source])
+                        ? Math.max(0, Math.min(20, values[source])) : 0;
+                energy += value * value * weight;
+                count += weight;
+            }
+            projected[index] = count == 0 ? 0 : (float) Math.sqrt(energy / count);
+        }
+        return projected;
     }
 
     public void clear() {
@@ -111,6 +133,7 @@ public final class WaveformView extends Region {
         Arrays.fill(spectrumPeaks, 0);
         cursor = 0;
         displayScale = 1.0;
+        observedMinFrequencyHz = Double.NaN;
         draw();
     }
 

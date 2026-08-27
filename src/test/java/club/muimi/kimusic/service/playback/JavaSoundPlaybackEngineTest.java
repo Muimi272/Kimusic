@@ -42,6 +42,38 @@ class JavaSoundPlaybackEngineTest {
     }
 
     @Test
+    void detectsTheLowestMeaningfulSpectrumFrequencyAboveNoise() {
+        float[] spectrum = new float[2_048];
+        spectrum[4] = 0.001f;
+        spectrum[80] = 0.5f;
+        spectrum[120] = 0.8f;
+
+        double minimum = JavaSoundPlaybackEngine.lowestActiveFrequency(
+                spectrum, 22_050.0, false);
+
+        assertEquals(80 * 22_050.0 / spectrum.length, minimum, 0.0001);
+    }
+
+    @Test
+    void keepsTheFirstAggregatedSpectrumBandAvailable() {
+        float[] spectrum = new float[64];
+        spectrum[0] = 0.8f;
+
+        double minimum = JavaSoundPlaybackEngine.lowestActiveFrequency(
+                spectrum, 20_000.0, true);
+
+        assertEquals(20.0, minimum, 0.0001);
+    }
+
+    @Test
+    void leavesTheMinimumFrequencyUnknownForSilentFrames() {
+        double minimum = JavaSoundPlaybackEngine.lowestActiveFrequency(
+                new float[2_048], 22_050.0, false);
+
+        assertTrue(Double.isNaN(minimum));
+    }
+
+    @Test
     void seeksWithinARealFlacStreamWithoutEndingPlayback() throws Exception {
         String configuredFile = System.getProperty("kimusic.flac.test");
         assumeTrue(configuredFile != null && Files.isRegularFile(Path.of(configuredFile)));

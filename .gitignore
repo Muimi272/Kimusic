@@ -55,7 +55,6 @@ release/
 *.sha256
 
 !/.mvn/wrapper/maven-wrapper.jar
-!/src/main/resources/club/muimi/kimusic/tools/windows-x64/ncmdump.exe
 
 ### Local IDE and build metadata ###
 .idea/
