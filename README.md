@@ -31,9 +31,12 @@ Kimusic works with local files and does not require an account or cloud service.
 - Read embedded metadata and artwork, with support for companion cover images.
 - Find companion lyric files, highlight and center the current line, and temporarily pause following during manual scrolling.
 - Switch between waveform and frequency-spectrum visualizations.
+- Adjust playback with a 10-band software equalizer, built-in presets, and saved custom presets.
 - Use light and dark themes, configurable lyric styling, smooth scrolling, playback fades, and artwork-derived backgrounds.
 - Switch the interface between English and Simplified Chinese.
 - Decode NCM files into a private local cache before playback.
+
+The software equalizer is applied by the Java Sound backend for MP3, FLAC, OGG, WAV, and AIFF. AAC and M4A use JavaFX Media and are not processed by the software equalizer.
 
 ## Installation (Releases)
 
@@ -59,6 +62,16 @@ chmod +x Kimusic-x86_64.AppImage
 ~~~
 
 If the system does not provide FUSE support, run the AppImage with <code>--appimage-extract-and-run</code>.
+
+## Build Client From Source
+
+The release workflow in [`.github/workflows/release.yml`](.github/workflows/release.yml) builds Windows and Linux artifacts when a `v*` tag is pushed. To reproduce a client locally, first run:
+
+~~~bash
+./mvnw clean package -DskipTests
+~~~
+
+Then assemble the runtime input and call `jpackage` for the target operating system. The Windows workflow produces EXE and MSI installers; the Linux workflow produces a DEB package and an x86-64 AppImage. The official workflow uses separate operating-system runners because `jpackage` creates native packages for the host platform.
 
 
 ## Development Requirements
@@ -87,7 +100,7 @@ Kimusic has no account system, analytics, telemetry, cloud synchronization, or r
 
 Application data is stored under <code>.kimusic</code> in the current user's home directory:
 
-- <code>~/.kimusic/state.bin</code> stores imported library folder paths, playlists and their track paths, the playback queue, the last selected track, volume, theme, language, visualization mode, lyric styling, and the automatic NCM decoding preference.
+- <code>~/.kimusic/state.bin</code> stores imported library folder paths, discovered audio file paths, playlists and their track paths, the playback queue, the last selected track, volume, theme, language, visualization mode, lyric styling, equalizer settings and the automatic NCM decoding preference.
 - <code>~/.kimusic/cache/ncm/</code> stores decoded audio produced from NCM files, including metadata and embedded artwork where available. These files remain until the cache is deleted manually.
 
 On Windows, <code>~</code> normally resolves to <code>%USERPROFILE%</code>. On Linux, it normally resolves to <code>$HOME</code>. Deleting the <code>.kimusic</code> directory resets saved state and removes the decoded NCM cache; original music, lyric, and artwork files are not modified or deleted.

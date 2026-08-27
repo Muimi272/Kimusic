@@ -4,6 +4,7 @@ import club.muimi.kimusic.service.playback.PlaybackEngine;
 import club.muimi.kimusic.service.playback.PlaybackEngines;
 import club.muimi.kimusic.service.playback.PlaybackListener;
 import club.muimi.kimusic.service.playback.VisualizationFrame;
+import club.muimi.kimusic.model.EqualizerSettings;
 import club.muimi.kimusic.status.PlayMode;
 import club.muimi.kimusic.status.Language;
 import javafx.animation.KeyFrame;
@@ -47,6 +48,8 @@ public final class MusicService {
     private final DoubleProperty currentSeconds = new SimpleDoubleProperty(0);
     private final DoubleProperty durationSeconds = new SimpleDoubleProperty(0);
     private final DoubleProperty volume = new SimpleDoubleProperty(0.8);
+    private final ObjectProperty<EqualizerSettings> equalizerSettings =
+            new SimpleObjectProperty<>(EqualizerSettings.defaults());
     private final ObjectProperty<Image> artwork = new SimpleObjectProperty<>();
     private final ObjectProperty<VisualizationFrame> visualization =
             new SimpleObjectProperty<>(VisualizationFrame.empty());
@@ -83,6 +86,20 @@ public final class MusicService {
                 }
                 closeOutgoingEngine();
                 engine.setVolume(bounded);
+            }
+        });
+        equalizerSettings.addListener((observable, oldValue, newValue) -> {
+            EqualizerSettings settings = newValue == null
+                    ? EqualizerSettings.defaults() : newValue.copy();
+            if (newValue == null) {
+                equalizerSettings.set(settings);
+                return;
+            }
+            if (engine != null) {
+                engine.setEqualizer(settings);
+            }
+            if (outgoingEngine != null) {
+                outgoingEngine.setEqualizer(settings);
             }
         });
     }
@@ -258,6 +275,18 @@ public final class MusicService {
         return volume;
     }
 
+    public ObjectProperty<EqualizerSettings> equalizerSettingsProperty() {
+        return equalizerSettings;
+    }
+
+    public EqualizerSettings getEqualizerSettings() {
+        return equalizerSettings.get().copy();
+    }
+
+    public void setEqualizerSettings(EqualizerSettings settings) {
+        equalizerSettings.set(settings == null ? EqualizerSettings.defaults() : settings.copy());
+    }
+
     public void setLanguage(Language language) {
         this.language = language == null ? Language.CHINESE : language;
     }
@@ -335,6 +364,7 @@ public final class MusicService {
         engine = engineFactory.apply(selectedBackend);
         PlaybackEngine activeEngine = engine;
         try {
+            activeEngine.setEqualizer(equalizerSettings.get());
             activeEngine.open(playbackTrack, listenerFor(
                             session, displayTrack, playbackTrack, autoPlay, activeEngine),
                     autoPlay ? 0 : volume.get(), autoPlay);

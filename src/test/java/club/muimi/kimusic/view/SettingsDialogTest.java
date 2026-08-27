@@ -50,8 +50,9 @@ class SettingsDialogTest {
                 Scene scene = new Scene(root);
                 scene.getStylesheets().add(KimusicApplication.class.getResource("kimusic.css").toExternalForm());
                 MainController controller = loader.getController();
-                context = new AppContext();
-                controller.initializeContext(context);
+                AppContext testContext = new AppContext();
+                context = testContext;
+                controller.initializeContext(testContext);
 
                 Platform.runLater(() -> {
                     try {
@@ -79,6 +80,8 @@ class SettingsDialogTest {
                         assertEquals(22, box.getPrefWidth(), 0.01);
                         assertNotNull(box.getBackground());
                         autoDecode.setSelected(true);
+                        assertTrue(testContext.isAutoDecodeNcm(),
+                                "settings should apply immediately when the option changes");
                         dialog.getScene().getRoot().applyCss();
                         assertEquals(Color.WHITE, mark.getBackground().getFills().getFirst().getFill());
                         dialog.getScene().getRoot().getStyleClass().remove("theme-light");

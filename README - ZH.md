@@ -31,9 +31,12 @@ Kimusic 直接处理本地文件，不需要账号或云服务。NCM 容器由�
 - 读取内嵌音频元数据和封面，也可使用同目录的封面图片。
 - 查找同目录歌词文件、高亮并居中当前歌词；用户手动滚动后会暂时停止跟随。
 - 在波形图和频率频谱两种可视化模式之间切换。
+- 使用十段软件均衡器，选择内置预设或保存自定义预设。
 - 支持浅色/深色主题、歌词样式设置、平滑滚动、播放淡入淡出和封面取色背景。
 - 支持英文和简体中文界面。
 - 播放 NCM 前将其解码到本机私有缓存。
+
+软件均衡器由 Java Sound 后端应用于 MP3、FLAC、OGG、WAV 和 AIFF；AAC 与 M4A 使用 JavaFX Media 播放，暂不经过软件均衡器处理。
 
 ## 安装方式（Release）
 
@@ -59,6 +62,16 @@ chmod +x Kimusic-x86_64.AppImage
 ~~~
 
 如果系统没有提供 FUSE 支持，可使用 <code>--appimage-extract-and-run</code> 参数运行 AppImage。
+
+## 打包客户端
+
+仓库中的 [`.github/workflows/release.yml`](.github/workflows/release.yml) 会在推送 `v*` 标签时构建 Windows 和 Linux 客户端。若要在本地从源码复现客户端，先运行：
+
+~~~bash
+./mvnw clean package -DskipTests
+~~~
+
+然后准备运行时输入目录，并针对目标操作系统调用 `jpackage`。Windows 工作流会生成 EXE 和 MSI 安装包；Linux 工作流会生成 DEB 包和 x86-64 AppImage。官方工作流使用不同操作系统的 Runner，因为 `jpackage` 会按照宿主操作系统生成原生安装包。
 
 
 ## 开发环境要求
@@ -87,7 +100,7 @@ Kimusic 不提供账号系统、行为分析、遥测、云同步或运行时上
 
 应用数据保存在当前用户主目录下的 <code>.kimusic</code> 目录：
 
-- <code>~/.kimusic/state.bin</code> 保存已导入音乐库目录路径、歌单及歌曲路径、播放队列、最后选择的歌曲、音量、主题、语言、可视化模式、歌词样式和自动解码 NCM 设置。
+- <code>~/.kimusic/state.bin</code> 保存已导入音乐库目录路径、扫描发现的音频文件路径、歌单及歌曲路径、播放队列、最后选择的歌曲、音量、主题、语言、可视化模式、歌词样式、均衡器设置和自动解码 NCM 设置。
 - <code>~/.kimusic/cache/ncm/</code> 保存 NCM 文件解码后生成的音频；在可用时还会包含写入的元数据和内嵌封面。这些文件会一直保留，直至用户手动删除缓存。
 
 在 Windows 中，<code>~</code> 通常对应 <code>%USERPROFILE%</code>；在 Linux 中通常对应 <code>$HOME</code>。删除 <code>.kimusic</code> 目录会重置应用保存的状态并移除 NCM 解码缓存，但不会修改或删除原始音乐、歌词和封面文件。

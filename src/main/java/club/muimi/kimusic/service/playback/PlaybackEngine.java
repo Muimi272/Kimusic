@@ -1,5 +1,7 @@
 package club.muimi.kimusic.service.playback;
 
+import club.muimi.kimusic.model.EqualizerSettings;
+
 import java.nio.file.Path;
 
 public interface PlaybackEngine extends AutoCloseable {
@@ -12,6 +14,10 @@ public interface PlaybackEngine extends AutoCloseable {
     void seek(double seconds);
 
     void setVolume(double volume);
+
+    default void setEqualizer(EqualizerSettings settings) {
+        // Backends without PCM access may ignore the software equalizer.
+    }
 
     @Override
     void close();

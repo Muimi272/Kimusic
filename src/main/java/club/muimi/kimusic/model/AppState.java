@@ -26,6 +26,8 @@ public final class AppState implements Serializable {
     private final String lyricHighlightColor;
     private final Boolean autoDecodeNcm;
     private final int lyricsFontSize;
+    private final EqualizerSettings equalizerSettings;
+    private final List<String> discoveredFiles;
 
     public AppState(List<String> libraryRoots, Map<String, List<String>> playlists,
                     List<String> queue, boolean darkTheme, double volume) {
@@ -56,6 +58,26 @@ public final class AppState implements Serializable {
                     List<String> queue, boolean darkTheme, double volume,
                     VisualizationMode visualizationMode, String lastTrack, Language language,
                     String lyricHighlightColor, boolean autoDecodeNcm, int lyricsFontSize) {
+        this(libraryRoots, playlists, queue, darkTheme, volume, visualizationMode, lastTrack,
+                language, lyricHighlightColor, autoDecodeNcm, lyricsFontSize,
+                EqualizerSettings.defaults(), List.of());
+    }
+
+    public AppState(List<String> libraryRoots, Map<String, List<String>> playlists,
+                    List<String> queue, boolean darkTheme, double volume,
+                    VisualizationMode visualizationMode, String lastTrack, Language language,
+                    String lyricHighlightColor, boolean autoDecodeNcm, int lyricsFontSize,
+                    EqualizerSettings equalizerSettings) {
+        this(libraryRoots, playlists, queue, darkTheme, volume, visualizationMode, lastTrack,
+                language, lyricHighlightColor, autoDecodeNcm, lyricsFontSize,
+                equalizerSettings, List.of());
+    }
+
+    public AppState(List<String> libraryRoots, Map<String, List<String>> playlists,
+                    List<String> queue, boolean darkTheme, double volume,
+                    VisualizationMode visualizationMode, String lastTrack, Language language,
+                    String lyricHighlightColor, boolean autoDecodeNcm, int lyricsFontSize,
+                    EqualizerSettings equalizerSettings, List<String> discoveredFiles) {
         this.version = 1;
         this.libraryRoots = new ArrayList<>(libraryRoots);
         this.playlists = new LinkedHashMap<>();
@@ -70,6 +92,9 @@ public final class AppState implements Serializable {
         this.lyricHighlightColor = normalizeColor(lyricHighlightColor);
         this.autoDecodeNcm = autoDecodeNcm;
         this.lyricsFontSize = Math.max(11, Math.min(24, lyricsFontSize));
+        this.equalizerSettings = equalizerSettings == null
+                ? EqualizerSettings.defaults() : equalizerSettings.copy();
+        this.discoveredFiles = discoveredFiles == null ? List.of() : List.copyOf(discoveredFiles);
     }
 
     public static AppState empty() {
@@ -124,6 +149,14 @@ public final class AppState implements Serializable {
 
     public int getLyricsFontSize() {
         return lyricsFontSize >= 11 && lyricsFontSize <= 24 ? lyricsFontSize : 14;
+    }
+
+    public EqualizerSettings getEqualizerSettings() {
+        return equalizerSettings == null ? EqualizerSettings.defaults() : equalizerSettings.copy();
+    }
+
+    public List<String> getDiscoveredFiles() {
+        return discoveredFiles == null ? List.of() : List.copyOf(discoveredFiles);
     }
 
     private static String normalizeColor(String value) {

@@ -551,6 +551,98 @@
     -fx-text-fill: white;
 }
 
+.equalizer-dialog-content {
+    -fx-padding: 18px 20px 12px 20px;
+    -fx-min-height: 320px;
+}
+
+.equalizer-header {
+    -fx-padding: 0 0 4px 0;
+    -fx-alignment: center-left;
+}
+
+.equalizer-header .label {
+    -fx-opacity: 0.72;
+}
+
+.equalizer-presets {
+    -fx-background-radius: 5px;
+    -fx-border-radius: 5px;
+}
+
+.equalizer-save-preset {
+    -fx-padding: 7px 14px;
+}
+
+.equalizer-bands {
+    -fx-padding: 8px 4px 10px 4px;
+    -fx-alignment: center;
+}
+
+.equalizer-bands .label {
+    -fx-font-size: 11px;
+}
+
+.equalizer-footer {
+    -fx-padding: 6px 0 0 0;
+    -fx-border-width: 1px 0 0 0;
+    -fx-border-color: rgba(112, 126, 125, 0.22);
+}
+
+.equalizer-enabled {
+    -fx-padding: 4px 0 0 0;
+}
+
+.scan-dialog-content {
+    -fx-padding: 22px 24px 16px 24px;
+    -fx-min-height: 150px;
+}
+
+.scan-dialog-scope {
+    -fx-font-size: 14px;
+    -fx-padding: 2px 0 0 0;
+}
+
+.scan-dialog-footer {
+    -fx-padding: 14px 0 0 0;
+    -fx-border-width: 1px 0 0 0;
+    -fx-border-color: rgba(112, 126, 125, 0.22);
+}
+
+.scan-dialog-note {
+    -fx-font-size: 11px;
+    -fx-font-weight: normal;
+    -fx-opacity: 0.58;
+}
+
+.scan-scope-button {
+    -fx-padding: 6px 10px;
+    -fx-font-size: 12px;
+}
+
+.scan-progress-dialog {
+    -fx-padding: 24px;
+    -fx-min-height: 120px;
+}
+
+.scan-progress-status {
+    -fx-font-size: 14px;
+}
+
+.scan-progress-percent {
+    -fx-font-family: "JetBrains Mono SemiBold";
+    -fx-opacity: 0.72;
+}
+
+.scan-progress-bar {
+    -fx-pref-height: 10px;
+}
+
+.scan-cancel-button,
+.scan-background-button {
+    -fx-min-width: 148px;
+}
+
 .settings-content {
     -fx-padding: 22px 24px 6px 24px;
 }
@@ -732,6 +824,12 @@
     -fx-min-height: 4px;
     -fx-background-color: #1aa79b;
     -fx-background-radius: 3px;
+}
+
+.slider:vertical .track,
+.slider:vertical .colored-track {
+    -fx-pref-width: 4px;
+    -fx-min-width: 4px;
 }
 
 .theme-light .slider .track {
