@@ -551,6 +551,45 @@
     -fx-text-fill: white;
 }
 
+.add-playlist-dialog-content {
+    -fx-padding: 22px 24px 16px 24px;
+    -fx-min-height: 170px;
+}
+
+.add-playlist-caption {
+    -fx-font-size: 12px;
+    -fx-opacity: 0.62;
+}
+
+.add-playlist-track {
+    -fx-font-size: 15px;
+    -fx-padding: 10px 12px;
+    -fx-background-radius: 5px;
+    -fx-border-radius: 5px;
+    -fx-border-width: 1px;
+}
+
+.theme-light .add-playlist-track {
+    -fx-background-color: #f4f7f6;
+    -fx-border-color: #d9e2df;
+}
+
+.theme-dark .add-playlist-track {
+    -fx-background-color: #202625;
+    -fx-border-color: #374341;
+}
+
+.add-playlist-choices {
+    -fx-pref-height: 36px;
+    -fx-background-radius: 5px;
+    -fx-border-radius: 5px;
+}
+
+.add-playlist-create {
+    -fx-min-width: 112px;
+    -fx-pref-height: 36px;
+}
+
 .equalizer-dialog-content {
     -fx-padding: 18px 20px 12px 20px;
     -fx-min-height: 320px;
@@ -677,6 +716,17 @@
 .scan-dialog-scope {
     -fx-font-size: 14px;
     -fx-padding: 2px 0 0 0;
+}
+
+.scan-dialog-title {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+}
+
+.scan-dialog-selected-scope {
+    -fx-font-size: 11px;
+    -fx-font-weight: normal;
+    -fx-opacity: 0.58;
 }
 
 .scan-dialog-footer {

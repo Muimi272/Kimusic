@@ -243,7 +243,6 @@ public final class MainController {
     private Task<List<Path>> audioScanTask;
     private Dialog<ButtonType> audioScanDialog;
     private List<Path> audioScanRoots = List.of();
-    private boolean audioScanUsesDefaultRoots;
     private Label audioScanStatusLabel;
     private Label audioScanPercentLabel;
     private ProgressBar audioScanProgressBar;
@@ -423,15 +422,18 @@ public final class MainController {
         styleDialog(dialog);
         dialog.initOwner(root.getScene().getWindow());
         dialog.setTitle(t("加入歌单"));
-        dialog.setHeaderText(titleOf(track));
+        dialog.setHeaderText(null);
         ButtonType confirm = new ButtonType(t("加入歌单"), ButtonBar.ButtonData.OK_DONE);
         ButtonType cancel = new ButtonType(t("取消"), ButtonBar.ButtonData.CANCEL_CLOSE);
         dialog.getDialogPane().getButtonTypes().setAll(confirm, cancel);
         ComboBox<String> choices = new ComboBox<>(FXCollections.observableArrayList(context.playlists().names()));
+        choices.setMaxWidth(Double.MAX_VALUE);
+        choices.getStyleClass().add("add-playlist-choices");
         String selected = playlistList.getSelectionModel().getSelectedItem();
         if (selected != null && choices.getItems().contains(selected)) choices.setValue(selected);
         else if (!choices.getItems().isEmpty()) choices.getSelectionModel().selectFirst();
         Button create = new Button(t("新建歌单"));
+        create.getStyleClass().addAll("text-action", "add-playlist-create");
         create.setOnAction(event -> {
             TextInputDialog nameDialog = new TextInputDialog();
             styleDialog(nameDialog);
@@ -450,9 +452,28 @@ public final class MainController {
                 }
             });
         });
-        VBox content = new VBox(10, new Label(t("目标歌单")), new HBox(10, choices, create));
-        content.setPadding(new Insets(8));
+        String trackTitle = titleOf(track);
+        Label trackCaption = new Label(t("曲目"));
+        trackCaption.getStyleClass().add("add-playlist-caption");
+        Label trackName = new Label(trackTitle);
+        trackName.setMaxWidth(480);
+        trackName.setMinWidth(0);
+        trackName.setWrapText(false);
+        trackName.setTextOverrun(OverrunStyle.ELLIPSIS);
+        trackName.setEllipsisString("...");
+        trackName.setTooltip(new Tooltip(trackTitle));
+        trackName.getStyleClass().add("add-playlist-track");
+        VBox trackSummary = new VBox(5, trackCaption, trackName);
+        Label targetCaption = new Label(t("目标歌单"));
+        targetCaption.getStyleClass().add("add-playlist-caption");
+        HBox selector = new HBox(10, choices, create);
+        selector.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(choices, Priority.ALWAYS);
+        VBox content = new VBox(20, trackSummary, new VBox(8, targetCaption, selector));
+        content.getStyleClass().add("add-playlist-dialog-content");
         dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setPrefWidth(560);
+        dialog.getDialogPane().setPrefHeight(260);
         dialog.showAndWait().ifPresent(result -> {
             String playlist = choices.getValue();
             if (result == confirm && playlist != null && context.playlists().addTrack(playlist, track)) {
@@ -891,7 +912,6 @@ public final class MainController {
         }
         audioScanTask = null;
         audioScanRoots = AudioScanService.defaultRoots();
-        audioScanUsesDefaultRoots = true;
         Dialog<ButtonType> dialog = new Dialog<>();
         audioScanDialog = dialog;
         styleDialog(dialog);
@@ -900,9 +920,18 @@ public final class MainController {
         ButtonType start = new ButtonType(t("开始扫描"), ButtonBar.ButtonData.OK_DONE);
         ButtonType close = new ButtonType(t("取消"), ButtonBar.ButtonData.CANCEL_CLOSE);
         dialog.getDialogPane().getButtonTypes().setAll(start, close);
-        Label scope = new Label(scanScopeText());
-        scope.setWrapText(true);
-        scope.getStyleClass().add("scan-dialog-scope");
+        Label heading = new Label(t("快速查找所有可用的音乐文件"));
+        heading.setWrapText(true);
+        heading.getStyleClass().add("scan-dialog-title");
+        Label selectedScope = new Label();
+        selectedScope.setWrapText(true);
+        selectedScope.setMaxWidth(Double.MAX_VALUE);
+        selectedScope.setTextOverrun(OverrunStyle.ELLIPSIS);
+        selectedScope.setEllipsisString("...");
+        selectedScope.setVisible(false);
+        selectedScope.setManaged(false);
+        selectedScope.getStyleClass().add("scan-dialog-selected-scope");
+        VBox scanHeading = new VBox(5, heading, selectedScope);
         Button choose = new Button(t("选择扫描范围"));
         choose.setOnAction(event -> {
             DirectoryChooser chooser = new DirectoryChooser();
@@ -910,11 +939,14 @@ public final class MainController {
             File selected = chooser.showDialog(root.getScene().getWindow());
             if (selected != null) {
                 audioScanRoots = List.of(selected.toPath().toAbsolutePath().normalize());
-                audioScanUsesDefaultRoots = false;
-                scope.setText(scanScopeText());
+                selectedScope.setText(audioScanRoots.getFirst().toString());
+                selectedScope.setTooltip(new Tooltip(audioScanRoots.getFirst().toString()));
+                selectedScope.setVisible(true);
+                selectedScope.setManaged(true);
             }
         });
         choose.getStyleClass().addAll("text-action", "scan-scope-button");
+        choose.setMinWidth(132);
         Label timeNote = new Label(t("该功能会扫描整个设备中的所有文件，会耗时较久。"));
         Label exclusionNote = new Label(t("常见系统目录、缓存目录和构建目录会自动跳过。"));
         timeNote.setWrapText(true);
@@ -927,7 +959,7 @@ public final class MainController {
         HBox footer = new HBox(16, notes, choose);
         footer.setAlignment(Pos.BOTTOM_RIGHT);
         footer.getStyleClass().add("scan-dialog-footer");
-        VBox content = new VBox(28, scope, footer);
+        VBox content = new VBox(28, scanHeading, footer);
         content.getStyleClass().add("scan-dialog-content");
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().setPrefWidth(560);
@@ -937,13 +969,6 @@ public final class MainController {
             startAudioScan(dialog);
         });
         dialog.show();
-    }
-
-    private String scanScopeText() {
-        if (!audioScanUsesDefaultRoots && audioScanRoots.size() == 1) {
-            return t("扫描范围") + ": " + audioScanRoots.getFirst();
-        }
-        return t("扫描范围") + ": " + t("所有可访问磁盘");
     }
 
     private void startAudioScan(Dialog<ButtonType> dialog) {
