@@ -793,6 +793,7 @@ public final class MainController {
         bandsViewport.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         bandsViewport.getStyleClass().add("equalizer-bands-viewport");
         bands.setAlignment(Pos.CENTER);
+        bands.setPadding(new Insets(8, 16, 10, 16));
         bands.getStyleClass().add("equalizer-bands");
         Slider[] sliders = new Slider[EqualizerSettings.BAND_COUNT];
         boolean[] applyingPreset = {false};
@@ -873,7 +874,7 @@ public final class MainController {
         VBox content = new VBox(18, header, bandsViewport, footer);
         content.getStyleClass().add("equalizer-dialog-content");
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().setPrefWidth(760);
+        dialog.getDialogPane().setPrefWidth(900);
         dialog.setOnHidden(event -> context.save());
         dialog.showAndWait();
     }
