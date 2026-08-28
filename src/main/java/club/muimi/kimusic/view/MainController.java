@@ -873,7 +873,7 @@ public final class MainController {
         VBox content = new VBox(18, header, bandsViewport, footer);
         content.getStyleClass().add("equalizer-dialog-content");
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().setPrefWidth(650);
+        dialog.getDialogPane().setPrefWidth(760);
         dialog.setOnHidden(event -> context.save());
         dialog.showAndWait();
     }
