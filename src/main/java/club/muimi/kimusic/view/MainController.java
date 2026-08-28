@@ -783,7 +783,12 @@ public final class MainController {
         HBox bands = new HBox(10);
         ScrollPane bandsViewport = new ScrollPane(bands);
         bandsViewport.setFitToHeight(true);
-        bandsViewport.setFitToWidth(true);
+        // Keep the full band row wider than a narrow dialog so the high-frequency
+        // controls remain reachable through the horizontal scrollbar.
+        double bandWidth = 50;
+        bands.setMinWidth(EqualizerSettings.BAND_COUNT * bandWidth
+                + (EqualizerSettings.BAND_COUNT - 1) * 10 + 8);
+        bandsViewport.setFitToWidth(false);
         bandsViewport.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         bandsViewport.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         bandsViewport.getStyleClass().add("equalizer-bands-viewport");
