@@ -1,6 +1,7 @@
 package club.muimi.kimusic.util;
 
 import club.muimi.kimusic.model.AppState;
+import club.muimi.kimusic.model.EqualizerSettings;
 import club.muimi.kimusic.service.NoticeService;
 import club.muimi.kimusic.status.VisualizationMode;
 import club.muimi.kimusic.status.Language;
@@ -25,7 +26,9 @@ class DataSerializerTest {
         AppState expected = new AppState(List.of("C:/Music"),
                 Map.of("Focus", List.of("C:/Music/a.mp3")),
                 List.of("C:/Music/a.mp3"), true, 0.42, VisualizationMode.SPECTRUM,
-                "C:/Music/a.mp3", Language.ENGLISH, "#E5484D", false, 19);
+                "C:/Music/a.mp3", Language.ENGLISH, "#E5484D", false, 19,
+                new EqualizerSettings(true, "Focus", new double[]{1, 2}, Map.of("Focus", new double[]{1, 2})),
+                List.of("D:/Found/song.flac"));
 
         assertTrue(serializer.save(expected));
         AppState actual = serializer.load();
@@ -40,5 +43,8 @@ class DataSerializerTest {
         assertEquals("#E5484D", actual.getLyricHighlightColor());
         assertEquals(false, actual.isAutoDecodeNcm());
         assertEquals(19, actual.getLyricsFontSize());
+        assertTrue(actual.getEqualizerSettings().isEnabled());
+        assertEquals("Focus", actual.getEqualizerSettings().getActivePreset());
+        assertEquals(List.of("D:/Found/song.flac"), actual.getDiscoveredFiles());
     }
 }

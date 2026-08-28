@@ -1,5 +1,7 @@
 package club.muimi.kimusic.service.playback;
 
+import club.muimi.kimusic.model.EqualizerSettings;
+
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
@@ -28,6 +30,8 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
     private volatile SourceDataLine line;
     private volatile AudioInputStream stream;
     private volatile Closeable randomInput;
+    private volatile EqualizerSettings equalizerSettings = EqualizerSettings.defaults();
+    private final EqualizerProcessor equalizer = new EqualizerProcessor();
 
     @Override
     public void open(Path track, PlaybackListener listener, double initialVolume, boolean autoPlay) {
@@ -68,6 +72,11 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
     @Override
     public void setVolume(double value) {
         volume = Math.max(0, Math.min(1, value));
+    }
+
+    @Override
+    public void setEqualizer(EqualizerSettings settings) {
+        equalizerSettings = settings == null ? EqualizerSettings.defaults() : settings.copy();
     }
 
     @Override
@@ -479,6 +488,8 @@ final class JavaSoundPlaybackEngine implements PlaybackEngine {
 
     private VisualizationFrame analyzeAndApplyVolume(byte[] buffer, int length, int channels,
                                                       double maxFrequencyHz) {
+        equalizer.process(buffer, length, Math.max(1, channels), maxFrequencyHz * 2,
+                equalizerSettings);
         float[] waveform = new float[64];
         int sampleCount = Math.max(1, length / 2);
         int samplesPerBand = Math.max(1, sampleCount / waveform.length);

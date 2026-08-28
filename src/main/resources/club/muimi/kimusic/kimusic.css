@@ -551,6 +551,229 @@
     -fx-text-fill: white;
 }
 
+.add-playlist-dialog-content {
+    -fx-padding: 22px 24px 16px 24px;
+    -fx-min-height: 170px;
+}
+
+.add-playlist-caption {
+    -fx-font-size: 12px;
+    -fx-opacity: 0.62;
+}
+
+.add-playlist-track {
+    -fx-font-size: 15px;
+    -fx-padding: 10px 12px;
+    -fx-background-radius: 5px;
+    -fx-border-radius: 5px;
+    -fx-border-width: 1px;
+}
+
+.theme-light .add-playlist-track {
+    -fx-background-color: #f4f7f6;
+    -fx-border-color: #d9e2df;
+}
+
+.theme-dark .add-playlist-track {
+    -fx-background-color: #202625;
+    -fx-border-color: #374341;
+}
+
+.add-playlist-choices {
+    -fx-pref-height: 36px;
+    -fx-background-radius: 5px;
+    -fx-border-radius: 5px;
+}
+
+.add-playlist-create {
+    -fx-min-width: 112px;
+    -fx-pref-height: 36px;
+}
+
+.equalizer-dialog-content {
+    -fx-padding: 18px 20px 12px 20px;
+    -fx-min-height: 320px;
+}
+
+.equalizer-header {
+    -fx-padding: 0 0 4px 0;
+    -fx-alignment: center-left;
+}
+
+.equalizer-header .label {
+    -fx-opacity: 0.72;
+}
+
+.equalizer-presets {
+    -fx-background-radius: 5px;
+    -fx-border-radius: 5px;
+    -fx-padding: 2px 8px;
+}
+
+.theme-light .equalizer-presets {
+    -fx-background-color: #f7faf9;
+    -fx-border-color: #b6c4c1;
+}
+
+.theme-dark .equalizer-presets {
+    -fx-background-color: #242a29;
+    -fx-border-color: #596864;
+}
+
+.equalizer-presets:hover,
+.equalizer-presets:focused {
+    -fx-border-color: #1aa79b;
+}
+
+.equalizer-save-preset {
+    -fx-padding: 7px 14px;
+}
+
+.equalizer-bands {
+    -fx-padding: 8px 16px 10px 16px;
+    -fx-alignment: center;
+}
+
+.equalizer-bands-viewport {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.equalizer-bands-viewport > .viewport {
+    -fx-background-color: transparent;
+}
+
+.equalizer-bands .label {
+    -fx-font-size: 11px;
+}
+
+.equalizer-footer {
+    -fx-padding: 6px 0 0 0;
+    -fx-border-width: 1px 0 0 0;
+    -fx-border-color: rgba(112, 126, 125, 0.22);
+}
+
+.equalizer-enabled {
+    -fx-padding: 5px 10px 5px 4px;
+    -fx-cursor: hand;
+}
+
+.equalizer-enabled > .box {
+    -fx-min-width: 21px;
+    -fx-pref-width: 21px;
+    -fx-max-width: 21px;
+    -fx-min-height: 21px;
+    -fx-pref-height: 21px;
+    -fx-max-height: 21px;
+    -fx-background-radius: 5px;
+    -fx-border-radius: 5px;
+    -fx-border-width: 1.5px;
+}
+
+.theme-light .equalizer-enabled > .box {
+    -fx-background-color: #f7faf9;
+    -fx-border-color: #8d9b98;
+}
+
+.theme-dark .equalizer-enabled > .box {
+    -fx-background-color: #242a29;
+    -fx-border-color: #71807d;
+}
+
+.equalizer-enabled:hover > .box,
+.equalizer-enabled:focused > .box {
+    -fx-border-color: #1aa79b;
+    -fx-effect: dropshadow(gaussian, rgba(26, 167, 155, 0.30), 8, 0.18, 0, 1);
+}
+
+.theme-light .equalizer-enabled:selected > .box {
+    -fx-background-color: #1aa79b;
+    -fx-border-color: #1aa79b;
+}
+
+.theme-dark .equalizer-enabled:selected > .box {
+    -fx-background-color: #55d6ca;
+    -fx-border-color: #7ce5dc;
+}
+
+.theme-light .equalizer-enabled:selected > .box > .mark {
+    -fx-background-color: white;
+    -fx-padding: 4px;
+}
+
+.theme-dark .equalizer-enabled:selected > .box > .mark {
+    -fx-background-color: #102321;
+    -fx-padding: 4px;
+}
+
+.scan-dialog-content {
+    -fx-padding: 22px 24px 16px 24px;
+    -fx-min-height: 150px;
+}
+
+.scan-dialog-scope {
+    -fx-font-size: 14px;
+    -fx-padding: 2px 0 0 0;
+}
+
+.scan-dialog-title {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+}
+
+.scan-dialog-selected-scope {
+    -fx-font-size: 11px;
+    -fx-font-weight: normal;
+    -fx-opacity: 0.58;
+}
+
+.scan-dialog-footer {
+    -fx-padding: 14px 0 0 0;
+    -fx-border-width: 1px 0 0 0;
+    -fx-border-color: rgba(112, 126, 125, 0.22);
+}
+
+.scan-dialog-note {
+    -fx-font-size: 11px;
+    -fx-font-weight: normal;
+    -fx-opacity: 0.58;
+}
+
+.scan-scope-button {
+    -fx-padding: 6px 10px;
+    -fx-font-size: 12px;
+}
+
+.scan-progress-dialog {
+    -fx-padding: 24px;
+    -fx-min-height: 120px;
+}
+
+.scan-progress-status {
+    -fx-font-size: 14px;
+}
+
+.scan-progress-percent {
+    -fx-font-family: "JetBrains Mono SemiBold";
+    -fx-opacity: 0.72;
+}
+
+.scan-progress-bar {
+    -fx-pref-height: 10px;
+}
+
+.scan-cancel-button,
+.scan-background-button {
+    -fx-min-width: 148px;
+}
+
+.scan-progress-dialog-pane > .button-bar > .container {
+    -fx-alignment: center;
+    -fx-spacing: 18px;
+}
+
 .settings-content {
     -fx-padding: 22px 24px 6px 24px;
 }
@@ -732,6 +955,12 @@
     -fx-min-height: 4px;
     -fx-background-color: #1aa79b;
     -fx-background-radius: 3px;
+}
+
+.slider:vertical .track,
+.slider:vertical .colored-track {
+    -fx-pref-width: 4px;
+    -fx-min-width: 4px;
 }
 
 .theme-light .slider .track {

@@ -33,6 +33,7 @@ public final class AppContext {
     public AppContext() {
         AppState state = serializer.load();
         library.restore(state.getLibraryRoots());
+        library.restoreDiscoveredFiles(state.getDiscoveredFiles());
         playlists.restore(state.getPlaylists());
         List<Path> queue = state.getQueue().stream().map(Path::of)
                 .filter(Files::isRegularFile).toList();
@@ -56,6 +57,7 @@ public final class AppContext {
         lyricsFontSize = state.getLyricsFontSize();
         music.setLanguage(language);
         music.setAutoDecodeNcm(autoDecodeNcm);
+        music.setEqualizerSettings(state.getEqualizerSettings());
     }
 
     public void save() {
@@ -64,7 +66,8 @@ public final class AppContext {
         serializer.save(new AppState(library.snapshot(), playlists.snapshot(), queue,
                 darkTheme, music.volumeProperty().get(), visualizationMode,
                 current == null ? null : current.toString(), language,
-                lyricHighlightColor, autoDecodeNcm, lyricsFontSize));
+                lyricHighlightColor, autoDecodeNcm, lyricsFontSize,
+                music.getEqualizerSettings(), library.snapshotDiscoveredFiles()));
     }
 
     public void close() {

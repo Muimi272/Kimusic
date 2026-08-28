@@ -91,6 +91,15 @@ class MainViewTest {
                 TreeView<Path> libraryTree = (TreeView<Path>) root.lookup("#libraryTree");
                 @SuppressWarnings("unchecked")
                 ListView<String> playlistList = (ListView<String>) root.lookup("#playlistList");
+                assertNotNull(root.lookup("#equalizerButton"));
+                assertNotNull(root.lookup("#findAllAudioButton"));
+                Node equalizerButton = root.lookup("#equalizerButton");
+                Node modeButton = root.lookup("#modeButton");
+                assertEquals(equalizerButton.getParent(), modeButton.getParent());
+                assertTrue(((HBox) equalizerButton.getParent()).getChildren().indexOf(equalizerButton)
+                                < ((HBox) modeButton.getParent()).getChildren().indexOf(modeButton),
+                        "equalizer control must be immediately available to the left of playback mode");
+                assertEquals(4, trackTable.getColumns().size());
                 @SuppressWarnings("unchecked")
                 TableColumn<Path, String> titleColumn =
                         (TableColumn<Path, String>) trackTable.getColumns().get(1);

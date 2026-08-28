@@ -3,6 +3,8 @@ package club.muimi.kimusic.view;
 import atlantafx.base.theme.PrimerDark;
 import atlantafx.base.theme.PrimerLight;
 import club.muimi.kimusic.AppContext;
+import club.muimi.kimusic.model.EqualizerSettings;
+import club.muimi.kimusic.service.AudioScanService;
 import club.muimi.kimusic.service.FileTreeService;
 import club.muimi.kimusic.service.LyricsService.LyricLine;
 import club.muimi.kimusic.service.NoticeService;
@@ -37,14 +39,15 @@ import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Dialog;
@@ -54,8 +57,10 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.Slider;
 import javafx.scene.control.ScrollBar;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
@@ -89,6 +94,7 @@ import javafx.scene.text.TextAlignment;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.event.ActionEvent;
 import javafx.util.Duration;
 
 import java.io.File;
@@ -133,6 +139,10 @@ public final class MainController {
     @FXML
     private Button modeButton;
     @FXML
+    private Button equalizerButton;
+    @FXML
+    private Button findAllAudioButton;
+    @FXML
     private SvgIcon modeIcon;
     @FXML
     private TreeView<Path> libraryTree;
@@ -146,6 +156,8 @@ public final class MainController {
     private TableColumn<Path, String> titleColumn;
     @FXML
     private TableColumn<Path, String> folderColumn;
+    @FXML
+    private TableColumn<Path, String> playlistActionColumn;
     @FXML
     private ListView<LyricLine> lyricsList;
     @FXML
@@ -228,6 +240,12 @@ public final class MainController {
     private Color displayedArtworkTone;
     private boolean libraryLoaded;
     private boolean libraryScanInFlight;
+    private Task<List<Path>> audioScanTask;
+    private Dialog<ButtonType> audioScanDialog;
+    private List<Path> audioScanRoots = List.of();
+    private Label audioScanStatusLabel;
+    private Label audioScanPercentLabel;
+    private ProgressBar audioScanProgressBar;
     private boolean songViewExpanded;
     private boolean lyricAutoFollowSuspended;
     private double previousWorkspaceDividerPosition = DEFAULT_WORKSPACE_DIVIDER_POSITION;
@@ -355,7 +373,7 @@ public final class MainController {
     private void removeLibraryRoot() {
         TreeItem<Path> selected = libraryTree.getSelectionModel().getSelectedItem();
         if (selected != null && selected.getParent() == libraryTree.getRoot()
-                && context.library().removeRootFile(selected.getValue().toFile())) {
+                && context.library().removeLibraryEntry(selected.getValue().toFile())) {
             libraryChanged();
         }
     }
@@ -392,35 +410,82 @@ public final class MainController {
     @FXML
     private void addToPlaylist() {
         Path track = trackTable.getSelectionModel().getSelectedItem();
+        addTrackToPlaylist(track);
+    }
+
+    private void addTrackToPlaylist(Path track) {
         if (track == null) {
             noticeService.addWarning(t("请先选择一首曲目。"));
             return;
         }
-        List<String> names = context.playlists().names();
-        if (names.isEmpty()) {
-            noticeService.addWarning(t("请先新建歌单。"));
-            return;
-        }
-        String selected = playlistList.getSelectionModel().getSelectedItem();
-        ChoiceDialog<String> dialog = new ChoiceDialog<>(selected == null ? names.getFirst() : selected, names);
+        Dialog<ButtonType> dialog = new Dialog<>();
         styleDialog(dialog);
-        // ChoiceDialog supplies a generic question-mark graphic; Kimusic uses
-        // icon-only controls, so keep this prompt visually quiet.
-        dialog.setGraphic(null);
-        dialog.getDialogPane().setGraphic(null);
         dialog.initOwner(root.getScene().getWindow());
         dialog.setTitle(t("加入歌单"));
-        dialog.setHeaderText(titleOf(track));
-        dialog.setContentText(t("目标歌单"));
-        dialog.showAndWait().ifPresent(playlist -> {
-            if (context.playlists().addTrack(playlist, track)) {
+        dialog.setHeaderText(null);
+        ButtonType confirm = new ButtonType(t("加入歌单"), ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancel = new ButtonType(t("取消"), ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().setAll(confirm, cancel);
+        ComboBox<String> choices = new ComboBox<>(FXCollections.observableArrayList(context.playlists().names()));
+        choices.setMaxWidth(Double.MAX_VALUE);
+        choices.getStyleClass().add("add-playlist-choices");
+        String selected = playlistList.getSelectionModel().getSelectedItem();
+        if (selected != null && choices.getItems().contains(selected)) choices.setValue(selected);
+        else if (!choices.getItems().isEmpty()) choices.getSelectionModel().selectFirst();
+        Button create = new Button(t("新建歌单"));
+        create.getStyleClass().addAll("text-action", "add-playlist-create");
+        create.setOnAction(event -> {
+            TextInputDialog nameDialog = new TextInputDialog();
+            styleDialog(nameDialog);
+            nameDialog.initOwner(dialog.getDialogPane().getScene().getWindow());
+            nameDialog.setTitle(t("新建歌单"));
+            nameDialog.setHeaderText(null);
+            nameDialog.setContentText(t("歌单名称"));
+            nameDialog.showAndWait().ifPresent(name -> {
+                if (context.playlists().create(name)) {
+                    populatePlaylists();
+                    String normalized = name.strip();
+                    choices.getItems().setAll(context.playlists().names());
+                    choices.setValue(normalized);
+                } else {
+                    noticeService.addWarning(t("歌单名称为空或已经存在。"));
+                }
+            });
+        });
+        String trackTitle = titleOf(track);
+        Label trackCaption = new Label(t("曲目"));
+        trackCaption.getStyleClass().add("add-playlist-caption");
+        Label trackName = new Label(trackTitle);
+        trackName.setMaxWidth(480);
+        trackName.setMinWidth(0);
+        trackName.setWrapText(false);
+        trackName.setTextOverrun(OverrunStyle.ELLIPSIS);
+        trackName.setEllipsisString("...");
+        trackName.setTooltip(new Tooltip(trackTitle));
+        trackName.getStyleClass().add("add-playlist-track");
+        VBox trackSummary = new VBox(5, trackCaption, trackName);
+        Label targetCaption = new Label(t("目标歌单"));
+        targetCaption.getStyleClass().add("add-playlist-caption");
+        HBox selector = new HBox(10, choices, create);
+        selector.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(choices, Priority.ALWAYS);
+        VBox content = new VBox(20, trackSummary, new VBox(8, targetCaption, selector));
+        content.getStyleClass().add("add-playlist-dialog-content");
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setPrefWidth(560);
+        dialog.getDialogPane().setPrefHeight(260);
+        dialog.showAndWait().ifPresent(result -> {
+            String playlist = choices.getValue();
+            if (result == confirm && playlist != null && context.playlists().addTrack(playlist, track)) {
                 noticeService.addInfo(language == Language.ENGLISH
                         ? "Added to \"" + playlist + "\"." : "已加入「" + playlist + "」。");
                 if (playlist.equals(playlistList.getSelectionModel().getSelectedItem())) {
                     showPlaylist(playlist);
                 }
                 context.save();
-            } else {
+            } else if (result == confirm && playlist == null) {
+                noticeService.addWarning(t("请先新建歌单。"));
+            } else if (result == confirm) {
                 noticeService.addWarning(t("曲目已经在该歌单中。"));
             }
         });
@@ -540,9 +605,8 @@ public final class MainController {
         styleDialog(dialog);
         dialog.initOwner(root.getScene().getWindow());
         dialog.setTitle(t("设置"));
-        ButtonType apply = new ButtonType(t("应用"), ButtonBar.ButtonData.OK_DONE);
-        ButtonType cancel = new ButtonType(t("取消"), ButtonBar.ButtonData.CANCEL_CLOSE);
-        dialog.getDialogPane().getButtonTypes().addAll(apply, cancel);
+        ButtonType close = new ButtonType(t("关闭"), ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().add(close);
 
         ImageView logo = new ImageView(new Image(
                 Objects.requireNonNull(MainController.class.getResourceAsStream("/club/muimi/kimusic/logo.png"))));
@@ -561,6 +625,13 @@ public final class MainController {
         darkTheme.setToggleGroup(themeGroup);
         (context.isDarkTheme() ? darkTheme : lightTheme).setSelected(true);
         HBox themeSelector = segmentedControl(lightTheme, darkTheme);
+        themeGroup.selectedToggleProperty().addListener((observable, oldToggle, selected) -> {
+            if (selected != null) {
+                boolean dark = selected == darkTheme;
+                applyTheme(dark);
+                updateDialogTheme(dialog, dark);
+            }
+        });
 
         ToggleButton waveformMode = segmentedButton(t("波形"));
         ToggleButton spectrumMode = segmentedButton(t("频谱"));
@@ -570,11 +641,20 @@ public final class MainController {
         (context.getVisualizationMode() == VisualizationMode.SPECTRUM
                 ? spectrumMode : waveformMode).setSelected(true);
         HBox visualizationSelector = segmentedControl(waveformMode, spectrumMode);
+        visualizationGroup.selectedToggleProperty().addListener((observable, oldToggle, selected) -> {
+            if (selected == null) return;
+            VisualizationMode mode = selected == spectrumMode
+                    ? VisualizationMode.SPECTRUM : VisualizationMode.WAVEFORM;
+            context.setVisualizationMode(mode);
+            waveformView.setMode(mode);
+        });
 
         Slider settingVolume = new Slider(0, 100, context.music().volumeProperty().get() * 100);
         Label volumeValue = styledLabel(Math.round(settingVolume.getValue()) + "%", "settings-value");
-        settingVolume.valueProperty().addListener((observable, oldValue, value) ->
-                volumeValue.setText(Math.round(value.doubleValue()) + "%"));
+        settingVolume.valueProperty().addListener((observable, oldValue, value) -> {
+            volumeValue.setText(Math.round(value.doubleValue()) + "%");
+            context.music().volumeProperty().set(value.doubleValue() / 100);
+        });
         HBox volumeHeading = settingRow(t("默认音量"), volumeValue);
 
         ToggleButton chineseLanguage = segmentedButton("中文");
@@ -584,12 +664,21 @@ public final class MainController {
         englishLanguage.setToggleGroup(languageGroup);
         (language == Language.ENGLISH ? englishLanguage : chineseLanguage).setSelected(true);
         HBox languageSelector = segmentedControl(chineseLanguage, englishLanguage);
+        languageGroup.selectedToggleProperty().addListener((observable, oldToggle, selected) -> {
+            if (selected != null) {
+                applyLanguage(selected == englishLanguage ? Language.ENGLISH : Language.CHINESE);
+            }
+        });
 
         Slider lyricSize = new Slider(11, 24, lyricsFontSize);
         lyricSize.setBlockIncrement(1);
         Label lyricSizeValue = styledLabel(Math.round(lyricSize.getValue()) + " px", "settings-value");
-        lyricSize.valueProperty().addListener((observable, oldValue, value) ->
-                lyricSizeValue.setText(Math.round(value.doubleValue()) + " px"));
+        lyricSize.valueProperty().addListener((observable, oldValue, value) -> {
+            lyricSizeValue.setText(Math.round(value.doubleValue()) + " px");
+            lyricsFontSize = (int) Math.round(value.doubleValue());
+            context.setLyricsFontSize(lyricsFontSize);
+            applyLyricsFontSize();
+        });
 
         ColorPicker lyricColor = new ColorPicker(Color.web(context.getLyricHighlightColor()));
         lyricColor.getStyleClass().add("lyric-color-picker");
@@ -598,11 +687,18 @@ public final class MainController {
                 "#8E5BD9", "#D14D8B")) {
             presets.getChildren().add(colorSwatch(color, lyricColor));
         }
+        lyricColor.valueProperty().addListener((observable, oldValue, value) -> {
+            String selectedColor = colorToHex(value);
+            context.setLyricHighlightColor(selectedColor);
+            applyLyricHighlightColor(selectedColor);
+        });
 
         CheckBox autoDecodeNcm = new CheckBox();
         autoDecodeNcm.setSelected(context.isAutoDecodeNcm());
         autoDecodeNcm.setAccessibleText(t("自动解码 NCM"));
         autoDecodeNcm.getStyleClass().add("ncm-auto-decode-check");
+        autoDecodeNcm.selectedProperty().addListener((observable, oldValue, value) ->
+                context.setAutoDecodeNcm(value));
 
         VBox appearancePage = new VBox(18,
                 settingsSection(t("界面"), settingRow(t("界面主题"), themeSelector),
@@ -652,23 +748,336 @@ public final class MainController {
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().setPrefWidth(720);
         dialog.getDialogPane().setPrefHeight(520);
-        dialog.showAndWait().filter(apply::equals).ifPresent(result -> {
-            applyTheme(darkTheme.isSelected());
-            VisualizationMode mode = spectrumMode.isSelected()
-                    ? VisualizationMode.SPECTRUM : VisualizationMode.WAVEFORM;
-            context.setVisualizationMode(mode);
-            waveformView.setMode(mode);
-            context.music().volumeProperty().set(settingVolume.getValue() / 100);
-            lyricsFontSize = (int) Math.round(lyricSize.getValue());
-            context.setLyricsFontSize(lyricsFontSize);
-            applyLyricsFontSize();
-            String selectedColor = colorToHex(lyricColor.getValue());
-            context.setLyricHighlightColor(selectedColor);
-            applyLyricHighlightColor(selectedColor);
-            context.setAutoDecodeNcm(autoDecodeNcm.isSelected());
-            applyLanguage(englishLanguage.isSelected() ? Language.ENGLISH : Language.CHINESE);
-            context.save();
+        dialog.setOnHidden(event -> context.save());
+        dialog.showAndWait();
+    }
+
+    @FXML
+    private void openEqualizer() {
+        EqualizerSettings draft = context.music().getEqualizerSettings();
+        Dialog<ButtonType> dialog = new Dialog<>();
+        styleDialog(dialog);
+        dialog.initOwner(root.getScene().getWindow());
+        dialog.setTitle(t("均衡器"));
+        ButtonType close = new ButtonType(t("关闭"), ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().setAll(close);
+
+        Runnable applyDraft = () -> context.music().setEqualizerSettings(draft);
+
+        CheckBox enabled = new CheckBox(t("启用均衡器"));
+        enabled.getStyleClass().add("equalizer-enabled");
+        enabled.setSelected(draft.isEnabled());
+        enabled.selectedProperty().addListener((observable, oldValue, value) -> {
+            draft.setEnabled(value);
+            applyDraft.run();
         });
+        ComboBox<String> presets = new ComboBox<>(FXCollections.observableArrayList(draft.allPresets().keySet()));
+        presets.getStyleClass().add("equalizer-presets");
+        presets.setPrefWidth(180);
+        presets.setCellFactory(list -> localizedPresetCell());
+        presets.setButtonCell(localizedPresetCell());
+        String active = draft.getActivePreset();
+        presets.setValue(draft.allPresets().containsKey(active) ? active : "Flat");
+        Button savePreset = new Button(t("保存为预设"));
+        savePreset.getStyleClass().addAll("text-action", "equalizer-save-preset");
+        HBox bands = new HBox(10);
+        ScrollPane bandsViewport = new ScrollPane(bands);
+        bandsViewport.setFitToHeight(true);
+        // Keep the full band row wider than a narrow dialog so the high-frequency
+        // controls remain reachable through the horizontal scrollbar.
+        double bandWidth = 50;
+        bands.setMinWidth(EqualizerSettings.BAND_COUNT * bandWidth
+                + (EqualizerSettings.BAND_COUNT - 1) * 10 + 8);
+        bandsViewport.setFitToWidth(false);
+        bandsViewport.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        bandsViewport.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        bandsViewport.getStyleClass().add("equalizer-bands-viewport");
+        bands.setAlignment(Pos.CENTER);
+        bands.setPadding(new Insets(8, 16, 10, 16));
+        bands.getStyleClass().add("equalizer-bands");
+        Slider[] sliders = new Slider[EqualizerSettings.BAND_COUNT];
+        boolean[] applyingPreset = {false};
+        for (int index = 0; index < sliders.length; index++) {
+            Label frequency = new Label(formatFrequency(EqualizerSettings.BAND_FREQUENCIES[index]));
+            Slider slider = new Slider(-12, 12, draft.getGains()[index]);
+            slider.setOrientation(Orientation.VERTICAL);
+            slider.setPrefHeight(190);
+            slider.setMinHeight(150);
+            slider.setMaxHeight(220);
+            slider.setPrefWidth(30);
+            slider.setBlockIncrement(1);
+            slider.setMajorTickUnit(6);
+            slider.setMinorTickCount(5);
+            slider.setShowTickMarks(true);
+            slider.setShowTickLabels(false);
+            Label value = new Label(formatGain(slider.getValue()));
+            slider.valueProperty().addListener((observable, oldValue, newValue) -> {
+                value.setText(formatGain(newValue.doubleValue()));
+                draft.setGains(java.util.Arrays.stream(sliders)
+                        .mapToDouble(Slider::getValue).toArray());
+                if (!applyingPreset[0]) {
+                    draft.setActivePreset("Custom");
+                    applyDraft.run();
+                }
+            });
+            sliders[index] = slider;
+            VBox band = new VBox(6, frequency, slider, value);
+            band.setAlignment(Pos.CENTER);
+            band.setMinWidth(50);
+            bands.getChildren().add(band);
+        }
+        presets.setOnAction(event -> {
+            String name = presets.getValue();
+            double[] selected = draft.allPresets().get(name);
+            if (selected != null) {
+                applyingPreset[0] = true;
+                try {
+                    draft.setGains(selected);
+                    for (int index = 0; index < sliders.length; index++) {
+                        sliders[index].setValue(selected[index]);
+                    }
+                    draft.setActivePreset(name);
+                } finally {
+                    applyingPreset[0] = false;
+                }
+                applyDraft.run();
+            }
+        });
+        savePreset.setOnAction(event -> {
+            TextInputDialog nameDialog = new TextInputDialog(draft.getActivePreset().equals("Custom") ? "" : draft.getActivePreset());
+            styleDialog(nameDialog);
+            nameDialog.initOwner(dialog.getDialogPane().getScene().getWindow());
+            nameDialog.setTitle(t("保存为预设"));
+            nameDialog.setHeaderText(null);
+            nameDialog.setContentText(t("预设名称"));
+            nameDialog.showAndWait().ifPresent(name -> {
+                if (!name.isBlank()) {
+                    draft.setCustomPreset(name, draft.getGains());
+                    draft.setActivePreset(name.strip());
+                    presets.getItems().setAll(draft.allPresets().keySet());
+                    presets.setValue(name.strip());
+                    applyDraft.run();
+                }
+            });
+        });
+        HBox presetSelector = new HBox(10, new Label(t("预设")), presets);
+        presetSelector.setAlignment(Pos.CENTER_LEFT);
+        BorderPane header = new BorderPane();
+        header.setLeft(presetSelector);
+        header.setRight(savePreset);
+        header.setMaxWidth(Double.MAX_VALUE);
+        header.getStyleClass().add("equalizer-header");
+        BorderPane footer = new BorderPane();
+        footer.setLeft(enabled);
+        footer.setMaxWidth(Double.MAX_VALUE);
+        footer.getStyleClass().add("equalizer-footer");
+        VBox content = new VBox(18, header, bandsViewport, footer);
+        content.getStyleClass().add("equalizer-dialog-content");
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setMinWidth(670);
+        dialog.getDialogPane().setPrefWidth(670);
+        dialog.setOnHidden(event -> context.save());
+        dialog.showAndWait();
+    }
+
+    private String formatFrequency(double frequency) {
+        return frequency >= 1000 ? String.format(Locale.ROOT, "%.0f kHz", frequency / 1000) : String.format(Locale.ROOT, "%.0f Hz", frequency);
+    }
+
+    private ListCell<String> localizedPresetCell() {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(String value, boolean empty) {
+                super.updateItem(value, empty);
+                setText(empty || value == null ? null : equalizerPresetLabel(value));
+            }
+        };
+    }
+
+    private String equalizerPresetLabel(String value) {
+        if (language == Language.ENGLISH) return value;
+        return switch (value) {
+            case "Bass Boost" -> "重低音";
+            case "Treble Boost" -> "高音增强";
+            case "Vocal" -> "人声";
+            case "Rock" -> "摇滚";
+            case "Classical" -> "古典";
+            case "Flat" -> "平直";
+            default -> value;
+        };
+    }
+
+    private String formatGain(double gain) {
+        return String.format(Locale.ROOT, "%+.1f dB", gain);
+    }
+
+    @FXML
+    private void openAudioScan() {
+        if (audioScanTask != null && !audioScanTask.isDone()) {
+            showAudioScanProgress();
+            return;
+        }
+        audioScanTask = null;
+        audioScanRoots = AudioScanService.defaultRoots();
+        Dialog<ButtonType> dialog = new Dialog<>();
+        audioScanDialog = dialog;
+        styleDialog(dialog);
+        dialog.initOwner(root.getScene().getWindow());
+        dialog.setTitle(t("快速查找所有可用的音乐文件"));
+        ButtonType start = new ButtonType(t("开始扫描"), ButtonBar.ButtonData.OK_DONE);
+        ButtonType close = new ButtonType(t("取消"), ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().setAll(start, close);
+        Label heading = new Label(t("快速查找所有可用的音乐文件"));
+        heading.setWrapText(true);
+        heading.getStyleClass().add("scan-dialog-title");
+        Label selectedScope = new Label();
+        selectedScope.setWrapText(true);
+        selectedScope.setMaxWidth(Double.MAX_VALUE);
+        selectedScope.setTextOverrun(OverrunStyle.ELLIPSIS);
+        selectedScope.setEllipsisString("...");
+        selectedScope.setVisible(false);
+        selectedScope.setManaged(false);
+        selectedScope.getStyleClass().add("scan-dialog-selected-scope");
+        VBox scanHeading = new VBox(5, heading, selectedScope);
+        Button choose = new Button(t("选择扫描范围"));
+        choose.setOnAction(event -> {
+            DirectoryChooser chooser = new DirectoryChooser();
+            chooser.setTitle(t("选择扫描范围"));
+            File selected = chooser.showDialog(root.getScene().getWindow());
+            if (selected != null) {
+                audioScanRoots = List.of(selected.toPath().toAbsolutePath().normalize());
+                selectedScope.setText(audioScanRoots.getFirst().toString());
+                selectedScope.setTooltip(new Tooltip(audioScanRoots.getFirst().toString()));
+                selectedScope.setVisible(true);
+                selectedScope.setManaged(true);
+            }
+        });
+        choose.getStyleClass().addAll("text-action", "scan-scope-button");
+        choose.setMinWidth(132);
+        Label timeNote = new Label(t("该功能会扫描整个设备中的所有文件，会耗时较久。"));
+        Label exclusionNote = new Label(t("常见系统目录、缓存目录和构建目录会自动跳过。"));
+        timeNote.setWrapText(true);
+        exclusionNote.setWrapText(true);
+        timeNote.getStyleClass().add("scan-dialog-note");
+        exclusionNote.getStyleClass().add("scan-dialog-note");
+        VBox notes = new VBox(3, timeNote, exclusionNote);
+        notes.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(notes, Priority.ALWAYS);
+        HBox footer = new HBox(16, notes, choose);
+        footer.setAlignment(Pos.BOTTOM_RIGHT);
+        footer.getStyleClass().add("scan-dialog-footer");
+        VBox content = new VBox(28, scanHeading, footer);
+        content.getStyleClass().add("scan-dialog-content");
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().setPrefWidth(560);
+        Node startButton = dialog.getDialogPane().lookupButton(start);
+        startButton.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
+            startAudioScan(dialog);
+        });
+        dialog.show();
+    }
+
+    private void startAudioScan(Dialog<ButtonType> dialog) {
+        if (audioScanTask != null && !audioScanTask.isDone()) return;
+        audioScanStatusLabel = new Label(t("正在扫描中"));
+        audioScanStatusLabel.getStyleClass().add("scan-progress-status");
+        audioScanPercentLabel = new Label("0%");
+        audioScanPercentLabel.getStyleClass().add("scan-progress-percent");
+        audioScanProgressBar = new ProgressBar(0);
+        audioScanProgressBar.getStyleClass().add("scan-progress-bar");
+        audioScanProgressBar.setMaxWidth(Double.MAX_VALUE);
+        VBox.setVgrow(audioScanProgressBar, Priority.NEVER);
+        BorderPane progressHeader = new BorderPane();
+        progressHeader.setLeft(audioScanStatusLabel);
+        progressHeader.setRight(audioScanPercentLabel);
+        VBox progress = new VBox(12, progressHeader, audioScanProgressBar);
+        progress.getStyleClass().add("scan-progress-dialog");
+        dialog.getDialogPane().setContent(progress);
+        dialog.getDialogPane().getStyleClass().add("scan-progress-dialog-pane");
+        ButtonType cancel = new ButtonType(t("取消扫描"), ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType background = new ButtonType(t("后台扫描"), ButtonBar.ButtonData.OTHER);
+        dialog.getDialogPane().getButtonTypes().setAll(cancel, background);
+        Node cancelButton = dialog.getDialogPane().lookupButton(cancel);
+        cancelButton.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
+            if (audioScanTask != null) audioScanTask.cancel();
+            dialog.hide();
+        });
+        Node backgroundButton = dialog.getDialogPane().lookupButton(background);
+        cancelButton.getStyleClass().add("scan-cancel-button");
+        backgroundButton.getStyleClass().add("scan-background-button");
+        cancelButton.setStyle("-fx-pref-width: 148px;");
+        backgroundButton.setStyle("-fx-pref-width: 148px;");
+        backgroundButton.addEventFilter(ActionEvent.ACTION, event -> {
+            event.consume();
+            dialog.hide();
+        });
+
+        List<Path> roots = List.copyOf(audioScanRoots);
+        Task<List<Path>> task = new Task<>() {
+            @Override
+            protected List<Path> call() {
+                return AudioScanService.scan(roots, (visited, total, found) -> {
+                    if (total > 0) updateProgress(visited, total);
+                    else updateProgress(visited > 0 ? 1 : 0, 1);
+                    updateMessage(t("已发现") + " " + found + t(" 首"));
+                }, this::isCancelled);
+            }
+        };
+        audioScanTask = task;
+        audioScanProgressBar.progressProperty().bind(task.progressProperty());
+        task.progressProperty().addListener((observable, oldValue, newValue) -> {
+            double value = newValue.doubleValue();
+            audioScanPercentLabel.setText(Math.round(Math.max(0, Math.min(1, value)) * 100) + "%");
+        });
+        task.messageProperty().addListener((observable, oldValue, message) -> {
+            if (message != null && !message.isBlank()) audioScanStatusLabel.setText(t("正在扫描中") + " - " + message);
+        });
+        task.setOnSucceeded(event -> finishAudioScan(task.getValue()));
+        task.setOnCancelled(event -> finishAudioScanCancelled());
+        task.setOnFailed(event -> finishAudioScanFailed(task.getException()));
+        Thread.ofVirtual().name("kimusic-device-audio-scan").start(task);
+    }
+
+    private void showAudioScanProgress() {
+        if (audioScanDialog == null) return;
+        audioScanDialog.show();
+    }
+
+    private void finishAudioScan(List<Path> found) {
+        int added = context.library().addDiscoveredFiles(found);
+        if (added > 0) libraryChanged();
+        if (audioScanStatusLabel != null) audioScanStatusLabel.setText(
+                t("扫描完成") + " - " + t("新增") + " " + added + t(" 首"));
+        if (audioScanPercentLabel != null) audioScanPercentLabel.setText("100%");
+        if (audioScanProgressBar != null) {
+            if (audioScanProgressBar.progressProperty().isBound()) {
+                audioScanProgressBar.progressProperty().unbind();
+            }
+            audioScanProgressBar.setProgress(1);
+        }
+        if (audioScanDialog != null) {
+            ButtonType confirm = new ButtonType(t("确认"), ButtonBar.ButtonData.OK_DONE);
+            audioScanDialog.getDialogPane().getButtonTypes().setAll(confirm);
+        }
+    }
+
+    private void finishAudioScanCancelled() {
+        if (audioScanStatusLabel != null) audioScanStatusLabel.setText(t("扫描已取消"));
+        if (audioScanDialog != null) {
+            ButtonType close = new ButtonType(t("关闭"), ButtonBar.ButtonData.CANCEL_CLOSE);
+            audioScanDialog.getDialogPane().getButtonTypes().setAll(close);
+        }
+    }
+
+    private void finishAudioScanFailed(Throwable error) {
+        if (audioScanStatusLabel != null) audioScanStatusLabel.setText(t("扫描失败"));
+        if (error != null) noticeService.addError(t("扫描失败") + ": " + error.getMessage());
+        if (audioScanDialog != null) {
+            ButtonType close = new ButtonType(t("关闭"), ButtonBar.ButtonData.CANCEL_CLOSE);
+            audioScanDialog.getDialogPane().getButtonTypes().setAll(close);
+        }
     }
 
     private Button colorSwatch(String color, ColorPicker target) {
@@ -730,8 +1139,13 @@ public final class MainController {
     private void styleDialog(Dialog<?> dialog) {
         dialog.getDialogPane().getStylesheets().add(
                 Objects.requireNonNull(MainController.class.getResource("/club/muimi/kimusic/kimusic.css")).toExternalForm());
-        dialog.getDialogPane().getStyleClass().addAll("kimusic-dialog",
-                context != null && context.isDarkTheme() ? "theme-dark" : "theme-light");
+        dialog.getDialogPane().getStyleClass().add("kimusic-dialog");
+        updateDialogTheme(dialog, context != null && context.isDarkTheme());
+    }
+
+    private void updateDialogTheme(Dialog<?> dialog, boolean dark) {
+        dialog.getDialogPane().getStyleClass().removeAll("theme-light", "theme-dark");
+        dialog.getDialogPane().getStyleClass().add(dark ? "theme-dark" : "theme-light");
     }
 
     private void configureTable() {
@@ -746,6 +1160,33 @@ public final class MainController {
         folderColumn.setCellValueFactory(cell -> new javafx.beans.property.SimpleStringProperty(
                 cell.getValue().getParent() == null ? "" : cell.getValue().getParent().toString()));
         folderColumn.setCellFactory(column -> alignedTableCell(Pos.CENTER_LEFT, true));
+        playlistActionColumn.setText(t("加入歌单"));
+        playlistActionColumn.setCellValueFactory(cell -> new javafx.beans.property.SimpleStringProperty(""));
+        playlistActionColumn.setCellFactory(column -> new TableCell<>() {
+            private final Button add = new Button();
+            private final SvgIcon addIcon = new SvgIcon();
+            {
+                addIcon.setResource("/club/muimi/kimusic/icons/plus.svg");
+                addIcon.setSize(15);
+                add.setGraphic(addIcon);
+                add.setTooltip(new Tooltip(t("加入歌单")));
+                add.getStyleClass().add("small-icon-action");
+                add.setOnAction(event -> addTrackToPlaylist(
+                        getTableView().getItems().get(getIndex())));
+                setAlignment(Pos.CENTER);
+            }
+            @Override
+            protected void updateItem(String value, boolean empty) {
+                super.updateItem(value, empty);
+                if (empty) {
+                    setGraphic(null);
+                    setTooltip(null);
+                } else {
+                    add.setTooltip(new Tooltip(t("加入歌单")));
+                    setGraphic(add);
+                }
+            }
+        });
         trackTable.setRowFactory(table -> {
             TableRow<Path> row = new TableRow<>() {
                 {
@@ -1244,7 +1685,7 @@ public final class MainController {
 
     private void populateLibraryTree() {
         TreeItem<Path> hiddenRoot = new TreeItem<>();
-        for (File rootFile : context.library().getRootFiles()) {
+        for (File rootFile : context.library().getLibraryEntries()) {
             hiddenRoot.getChildren().add(new LazyPathTreeItem(rootFile.toPath()));
         }
         libraryTree.setRoot(hiddenRoot);
@@ -1717,6 +2158,8 @@ public final class MainController {
         }
         titleColumn.setText(t("曲目"));
         folderColumn.setText(t("位置"));
+        playlistActionColumn.setText(t("加入歌单"));
+        equalizerButton.setTooltip(new Tooltip(t("均衡器")));
         updateModeIcon(context == null ? PlayMode.SEQUENTIAL : context.music().playModeProperty().get());
         updateCoverExpansionHint();
         if (context != null) {

@@ -81,13 +81,14 @@
                         </VBox>
                         <Region HBox.hgrow="ALWAYS" />
                         <Button mnemonicParsing="false" onAction="#showLibraryView" styleClass="text-action" text="全部曲目" />
-                        <Button mnemonicParsing="false" onAction="#addToPlaylist" styleClass="accent-action" text="加入歌单" />
+                        <Button fx:id="findAllAudioButton" mnemonicParsing="false" onAction="#openAudioScan" styleClass="accent-action" text="查找全部音乐" />
                     </HBox>
                     <TableView fx:id="trackTable" VBox.vgrow="ALWAYS">
                         <columns>
                             <TableColumn fx:id="indexColumn" maxWidth="58.0" minWidth="48.0" prefWidth="48.0" text="#" />
                             <TableColumn fx:id="titleColumn" minWidth="210.0" prefWidth="360.0" text="曲目" />
                             <TableColumn fx:id="folderColumn" minWidth="180.0" prefWidth="360.0" text="位置" />
+                            <TableColumn fx:id="playlistActionColumn" maxWidth="110.0" minWidth="96.0" prefWidth="104.0" />
                         </columns>
                         <placeholder><Label styleClass="empty-label" text="从左侧导入你的第一首音乐" /></placeholder>
                     </TableView>
@@ -164,6 +165,10 @@
                     <graphic><SvgIcon resource="/club/muimi/kimusic/icons/next.svg" size="20.0" /></graphic>
                 </Button>
                 <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="equalizerButton" accessibleText="均衡器" mnemonicParsing="false"
+                        onAction="#openEqualizer" styleClass="mode-action">
+                    <graphic><SvgIcon resource="/club/muimi/kimusic/icons/equalizer.svg" size="19.0" /></graphic>
+                </Button>
                 <Button fx:id="modeButton" accessibleText="顺序播放" mnemonicParsing="false"
                         onAction="#cyclePlayMode" styleClass="mode-action">
                     <graphic><SvgIcon fx:id="modeIcon" resource="/club/muimi/kimusic/icons/mode-sequential.svg" size="19.0" /></graphic>

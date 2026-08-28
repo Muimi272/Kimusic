@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -38,6 +39,17 @@ class FileTreeServiceTest {
         service.addRootFile(temporaryDirectory.toFile());
 
         assertEquals(3, service.scanAudioFiles().size());
+    }
+
+    @Test
+    void discoveredFilesAreIncludedWithoutRegisteringTheirParentAsARoot() throws Exception {
+        Path discovered = Files.write(temporaryDirectory.resolve("found.mp3"), new byte[]{1});
+        FileTreeService service = FileTreeService.init();
+
+        assertEquals(1, service.addDiscoveredFiles(List.of(discovered)));
+        assertEquals(List.of(discovered.toAbsolutePath().normalize()), service.scanAudioFiles());
+        assertEquals(List.of(discovered.toFile()), service.getLibraryEntries());
+        assertTrue(service.snapshot().isEmpty());
     }
 
     @Test
